@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
 		slider_horiz = UISliderCreate(&panel->e, 0);
 		slider_horiz->e.messageUser = MySliderHMessage;
 		UITextboxCreate(&panel->e, 0);
-		UITextboxCreate(&panel->e, UI_TEXTBOX_HIDE_CHARACTERS);
+		//UITextboxCreate(&panel->e, UI_TEXTBOX_HIDE_CHARACTERS); //TODO: Reintroduce UI_TEXTBOX_HIDE_CHARACTERS functionality
 		// Set default slider positions.
 		UISliderSetPosition(slider_vert, 0.1, true);
 		UISliderSetPosition(slider_horiz, 0.3, true);
