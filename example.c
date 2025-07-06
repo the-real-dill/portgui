@@ -4,7 +4,7 @@
 // #define UI_WINDOWS
 // #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "luigi2 (beta).h"
+#include "luigi2.h"
 
 UIWindow *window;
 UILabel *label;
@@ -116,10 +116,10 @@ int MyTableMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	return 0;
 }
 
-#ifdef UI_LINUX
-int main(int argc, char **argv) {
-#else
+#ifdef UI_WINDOWS
 int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
+#else
+int main(int argc, char **argv) {
 #endif
 
 	UIInitialise();
@@ -174,7 +174,7 @@ int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, i
 		// Top-Right pane.
 		UICode *code = UICodeCreate(&uisplit_top_leftright->e, 0);
 		char *buffer = (char *) malloc(262144);
-		FILE *f = fopen("luigi.h", "rb");
+		FILE *f = fopen("luigi2.h", "rb");
 		size_t size = fread(buffer, 1, 262144, f);
 		fclose(f);
 		UICodeInsertContent(code, buffer, size, true);

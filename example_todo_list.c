@@ -2,9 +2,11 @@
 
 // Include the Luigi library.
 
-#define UI_WINDOWS
+// #define UI_LINUX
+// #define UI_WINDOWS
+// #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "../util/luigi.h"
+#include "luigi2.h"
 
 // Include standard headers.
 
@@ -146,17 +148,21 @@ int InputTextboxMessage(UIElement *element, UIMessage message, int di, void *dp)
 	return 0;
 }
 
-int WinMain(HINSTANCE, HINSTANCE, char *, int) {
+#ifdef UI_WINDOWS
+int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
+#else
+int main(int argc, char **argv) {
+#endif
 	// Initialise Luigi and create a window.
 	
 	UIInitialise();
-	ui.theme = _uiThemeClassic;
+
 	UIWindowCreate(0, UI_ELEMENT_PARENT_PUSH, "To-do List", 0, 0);
-	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_MEDIUM_SPACING | UI_PANEL_GRAY);
+	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_MEDIUM_SPACING | UI_PANEL_COLOR_1);
 	
 	// Create the task insertion panel.
 
-	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_HORIZONTAL | UI_PANEL_MEDIUM_SPACING | UI_PANEL_GRAY | UI_ELEMENT_H_FILL);
+	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_HORIZONTAL | UI_PANEL_MEDIUM_SPACING | UI_PANEL_COLOR_1 | UI_ELEMENT_H_FILL);
 	UILabelCreate(0, 0, "Task:", -1);
 	inputTextbox = UITextboxCreate(0, 0);
 	inputTextbox->e.messageUser = InputTextboxMessage;
@@ -164,7 +170,7 @@ int WinMain(HINSTANCE, HINSTANCE, char *, int) {
 	
 	// Create the tabs panel.
 
-	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_HORIZONTAL | UI_PANEL_MEDIUM_SPACING | UI_PANEL_GRAY | UI_ELEMENT_H_FILL);
+	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_HORIZONTAL | UI_PANEL_MEDIUM_SPACING | UI_PANEL_COLOR_1 | UI_ELEMENT_H_FILL);
 #define SWITCH_TAB_BUTTON(label, target) { UIButton *b = UIButtonCreate(0, 0, label, -1); \
 		b->invoke = SwitchTab; b->e.cp = (void *) target; switchTabButtons[target] = b; }
 	SWITCH_TAB_BUTTON("All", TAB_ALL);
@@ -174,7 +180,7 @@ int WinMain(HINSTANCE, HINSTANCE, char *, int) {
 	
 	// Create the items panel.
 
-	itemsPanel = UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_WHITE 
+	itemsPanel = UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_COLOR_2 
 			| UI_PANEL_MEDIUM_SPACING | UI_ELEMENT_H_FILL 
 			| UI_ELEMENT_V_FILL | UI_PANEL_SCROLL);
 			

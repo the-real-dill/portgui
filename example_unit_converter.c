@@ -1,6 +1,8 @@
-#define UI_LINUX
+// #define UI_LINUX
+// #define UI_WINDOWS
+// #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "luigi.h"
+#include "luigi2.h"
 
 #include <stdio.h>
 
@@ -102,10 +104,14 @@ int InputMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	return 0;
 }
 
-int main() {
+#ifdef UI_WINDOWS
+int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
+#else
+int main(int argc, char **argv) {
+#endif
 	UIInitialise();
 	UIWindowCreate(0, UI_ELEMENT_PARENT_PUSH, "Converter", 500, 300);
-	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_GRAY | UI_PANEL_EXPAND | UI_PANEL_MEDIUM_SPACING);
+	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_COLOR_1 | UI_PANEL_EXPAND | UI_PANEL_MEDIUM_SPACING);
 	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_EXPAND | UI_PANEL_HORIZONTAL | UI_ELEMENT_V_FILL);
 	UITable *table = UITableCreate(0, UI_ELEMENT_H_FILL, "Category");
 	table->e.messageUser = CategoryTableMessage;
