@@ -147,7 +147,7 @@ void _UIClipboardReadTextEnd(UIWindow *window, char *text) {
 }
 
 UIWindow *UIInitialiseSDL() {
-	ui.theme = _uiThemeDark;
+	_UIInitialiseCommon();
 
 	cursors[UI_CURSOR_ARROW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
 	cursors[UI_CURSOR_TEXT] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
