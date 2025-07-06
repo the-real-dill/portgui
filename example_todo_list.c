@@ -12,11 +12,11 @@
 
 // Array of TODO items.
 
-struct Item {
+typedef struct Item {
 	char *text;
 	size_t textBytes;
 	bool completed;
-};
+} Item;
 
 Item *items;
 size_t itemCount;
