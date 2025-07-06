@@ -21,7 +21,7 @@
 #define UI_CLOCK_T uint32_t
 
 #define UI_IMPLEMENTATION
-#include "luigi.h"
+#include "luigi1.h"
 
 const int UI_KEYCODE_A = SDL_SCANCODE_A;
 const int UI_KEYCODE_BACKSPACE = SDL_SCANCODE_BACKSPACE;
