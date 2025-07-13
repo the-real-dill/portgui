@@ -640,6 +640,7 @@ typedef struct UITable {
 } UITable;
 
 typedef struct UITextbox {
+#define UI_TEXTBOX_HIDE_CHARACTERS (1 << 0)
 	UIElement e;
 	char *string;
 	ptrdiff_t bytes;
@@ -3808,9 +3809,19 @@ int _UITextboxMessage(UIElement *element, UIMessage message, int di, void *dp) {
 		selection.colorText = ui.theme.textSelected;
 		textBounds.l -= textbox->scroll;
 
-		UIDrawString((UIPainter *) dp, textBounds, textbox->string, textbox->bytes,
+		char *hiddenString = NULL;
+		if (element->flags & UI_TEXTBOX_HIDE_CHARACTERS) {
+			hiddenString = UI_MALLOC(textbox->bytes);
+			for (intptr_t i = 0; i < textbox->bytes; i++) {
+				hiddenString[i] = '*';
+			}
+		}
+
+		UIDrawString((UIPainter *) dp, textBounds, (element->flags & UI_TEXTBOX_HIDE_CHARACTERS) ? hiddenString : textbox->string, textbox->bytes,
 			(element->flags & UI_ELEMENT_DISABLED) ? ui.theme.textDisabled : ui.theme.text, UI_ALIGN_LEFT,
 			element->window->focused == element ? &selection : NULL);
+
+		if (hiddenString) UI_FREE(hiddenString);
 	} else if (message == UI_MSG_GET_CURSOR) {
 		return UI_CURSOR_TEXT;
 	} else if (message == UI_MSG_LEFT_DOWN) {
