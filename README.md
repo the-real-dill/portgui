@@ -2,6 +2,23 @@
 
 A barebones single-header GUI library for Win32, X11 and Essence. 
 
+###### NOTES ON THIS BRANCH:
+
+This is an updated branch of the [nakst/luigi](https://github.com/nakst/luigi) library.
+
+It makes the following changes:
+
+- Imports 'luigi2.h' from the [nakst/gf](https://github.com/nakst/gf) repository. This is the most up to date version of the luigi library.
+- Reorganizes file/folder structure for easier use.
+- Converts all examples to 'C' language. Minor changes/fixes so all examples build and run.
+- Reintroduces/Ports some functionality from 'luigi2 (beta).h' that was missing from the `nakst/gf` version.
+
+See commit log for details.
+
+This is intended as an 'updated' version of luigi2 with minimal changes.
+
+More significant develop happens on the main branch of [PortGUI](https://github.com/the-real-dill/portgui).
+
 ## Projects made with luigi
 
 Designer, https://gitlab.com/nakst/essence/-/blob/master/util/designer2.cpp
