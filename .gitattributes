@@ -1,0 +1,4 @@
+# GitHub was detecting the 'portgui.h' file as Objective-C, due to the very
+# small amount of that language used only in the MacOS platform backend.
+# This line fixes the incorrect language identification:
+*.h linguist-language=c
