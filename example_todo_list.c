@@ -1,12 +1,12 @@
 // A simple example of a "TODO" list.
 
-// Include the Luigi library.
+// Include the PortGUI library.
 
 // #define UI_LINUX
 // #define UI_WINDOWS
 // #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "luigi2.h"
+#include "portgui.h"
 
 // Include standard headers.
 
@@ -153,7 +153,7 @@ int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, i
 #else
 int main(int argc, char **argv) {
 #endif
-	// Initialise Luigi and create a window.
+	// Initialise PortGUI and create a window.
 	
 	UIInitialise();
 

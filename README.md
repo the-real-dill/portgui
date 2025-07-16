@@ -1,8 +1,10 @@
-# luigi
+# PortGUI
 
 A barebones single-header GUI library for Win32, X11 and Essence. 
 
-## Projects made with luigi
+This library is a fork of [nakst/luigi](https://github.com/nakst/luigi), and maintains 100% drop-in compatibility with the luigi library.
+
+## Projects made with PortGUI / luigi
 
 Designer, https://gitlab.com/nakst/essence/-/blob/master/util/designer2.cpp
 ![Screenshot of Designer, showing a list of layers, sequences, keyframes, properties, preview settings, and a preview of a checkbox being edited.](https://raw.githubusercontent.com/nakst/cdn/main/designer.png)
@@ -14,28 +16,22 @@ GDB frontend, https://github.com/nakst/gf/
 Various utility applications:
 ![Screenshot of a font editor, directory size viewer, image viewer, configuration editor, and a unit converter.](https://raw.githubusercontent.com/nakst/cdn/main/utils.jpg)
 
-## Bindings for other languages
-
-- Nim: https://github.com/neroist/luigi (MIT)
-- Teak: https://github.com/nakst/teak/tree/master/modules/luigi (MIT; incomplete)
-- Rust: https://github.com/ankddev/luigi-rs (MIT)
-
 ## Building the example
 
 ### Windows
 
-Update `luigi_example.c` to `#define UI_WINDOWS` at the top of the file, and then run the following command in a Visual Studio command prompt:
+Update `example.c` to `#define UI_WINDOWS` at the top of the file, and then run the following command in a Visual Studio command prompt:
 
 ```
-cl /O2 luigi_example.c user32.lib gdi32.lib shell32.lib
+cl /O2 example.c user32.lib gdi32.lib shell32.lib
 ```
 
 ### Linux
 
-Update `luigi_example.c` to `#define UI_LINUX` at the top of the file, and then run the following command in Bash:
+Update `example.c` to `#define UI_LINUX` at the top of the file, and then run the following command in Bash:
 
 ```
-gcc -O2 luigi_example.c -lX11 -lm -o luigi
+gcc -O2 example.c -lX11 -o example
 ```
 
 ## Linking with FreeType
@@ -89,7 +85,7 @@ The following source code demonstrates how to create an empty window.
 
 // Put the library implementation in this translation unit.
 #define UI_IMPLEMENTATION 
-#include "luigi.h"
+#include "portgui.h"
 
 // Use main() instead if you're on Linux.
 int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {

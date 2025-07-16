@@ -4,7 +4,7 @@
 // #define UI_WINDOWS
 // #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "luigi2.h"
+#include "portgui.h"
 
 UIWindow *window;
 UILabel *label;
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
 
 	UIInitialise();
 
-	window = UIWindowCreate(0, 0, "luigi2 - Example Application", 0, 0);
+	window = UIWindowCreate(0, 0, "PortGUI - Example Application", 0, 0);
 
     // Split window (vertically) into top/bottom panes.
 	UISplitPane *uisplit_topbottom = UISplitPaneCreate(&window->e, UI_SPLIT_PANE_VERTICAL, 0.75f);
@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
 		// Top-Right pane.
 		UICode *code = UICodeCreate(&uisplit_top_leftright->e, 0);
 		char *buffer = (char *) malloc(262144);
-		FILE *f = fopen("luigi2.h", "rb");
+		FILE *f = fopen("portgui.h", "rb");
 		size_t size = fread(buffer, 1, 262144, f);
 		fclose(f);
 		UICodeInsertContent(code, buffer, size, true);
@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
 
 	{
 		// Create a separate window demonstrating the MDI element
-		UIWindow *window = UIWindowCreate(0, 0, "luigi 2 - MDI Example", 0, 0);
+		UIWindow *window = UIWindowCreate(0, 0, "PortGUI - MDI Example", 0, 0);
 		UIMDIClient *client = UIMDIClientCreate(&window->e, 0);
 		UIMDIChild *child1 = UIMDIChildCreate(&client->e, UI_MDI_CHILD_CLOSE_BUTTON, UI_RECT_4(10, 600, 10, 400), "My Window", -1);
 		UIPanel *panel1 = UIPanelCreate(&child1->e, UI_PANEL_COLOR_1 | UI_PANEL_MEDIUM_SPACING);
