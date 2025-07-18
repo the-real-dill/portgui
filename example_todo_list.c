@@ -1,3 +1,9 @@
+/* ┌───────────────────────────────────────────────────────────────────────────┐
+   │ This example code is released into the public domain under the Unlicense. │
+   │ Feel free to use, modify, share, or sell it.                              │
+   │ Provided "as is," without warranty.       Details: http://unlicense.org/  │
+   └───────────────────────────────────────────────────────────────────────────┘ */
+
 // A simple example of a "TODO" list.
 
 // Include the PortGUI library.
