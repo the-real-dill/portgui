@@ -67,7 +67,7 @@ int CategoryTableMessage(UIElement *element, UIMessage message, int di, void *dp
 	if (message == UI_MSG_TABLE_GET_ITEM) {
 		UITableGetItem *m = (UITableGetItem *) dp;
 		m->isSelected = category == m->index;
-		return snprintf(m->buffer, m->bufferBytes, "%s", categories[m->index]);
+		return snprintf(m->buffer, m->bufferBytes, "%s", categories[m->index].name);
 	} else if (message == UI_MSG_LEFT_DOWN || message == UI_MSG_MOUSE_DRAG) {
 		int hit = UITableHitTest((UITable *) element, element->window->cursorX, element->window->cursorY);
 		if (hit != -1) category = hit;
