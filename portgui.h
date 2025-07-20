@@ -35,7 +35,7 @@
 #undef UNICODE
 #include <windows.h>
 
-#define UI_ASSERT(x) do { if (!(x)) { ui.assertionFailure = true; \
+#define UI_ASSERT(x) do { if (!(x)) { \
 	MessageBox(0, "Assertion failure on line " _UI_TO_STRING_2(__LINE__), 0, 0); \
 	ExitProcess(1); } } while (0)
 #define UI_CALLOC(x) HeapAlloc(ui.heap, HEAP_ZERO_MEMORY, (x))
@@ -1041,7 +1041,6 @@ struct {
 #ifdef UI_WINDOWS
 	HCURSOR cursors[UI_CURSOR_COUNT];
 	HANDLE heap;
-	bool assertionFailure;
 #endif
 
 #ifdef UI_ESSENCE
@@ -6287,7 +6286,7 @@ int _UIWindowMessage(UIElement *element, UIMessage message, int di, void *dp) {
 LRESULT CALLBACK _UIWindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	UIWindow *window = (UIWindow *) GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
-	if (!window || ui.assertionFailure) {
+	if (!window) {
 		return DefWindowProc(hwnd, message, wParam, lParam);
 	}
 
