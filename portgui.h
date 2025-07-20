@@ -3811,7 +3811,7 @@ int _UITextboxMessage(UIElement *element, UIMessage message, int di, void *dp) {
 
 		char *hiddenString = NULL;
 		if (element->flags & UI_TEXTBOX_HIDE_CHARACTERS) {
-			hiddenString = UI_MALLOC(textbox->bytes);
+			hiddenString = (char *) UI_MALLOC(textbox->bytes);
 			for (intptr_t i = 0; i < textbox->bytes; i++) {
 				hiddenString[i] = '*';
 			}
