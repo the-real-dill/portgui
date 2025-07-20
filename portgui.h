@@ -20,6 +20,13 @@
 #endif
 
 #ifdef UI_SSE2
+#if !defined(__i386__) && !defined(__x86_64__) && !defined(__amd64__)
+#pragma message("SSE2 is only available on x86/x64 architectures. Disabling.")
+#undef UI_SSE2
+#endif
+#endif
+
+#ifdef UI_SSE2
 #include <xmmintrin.h>
 #endif
 
