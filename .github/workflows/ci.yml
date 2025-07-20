@@ -1,0 +1,83 @@
+name: CI | Multi-Variant Build (examples + nakst/gf)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies (Linux/Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libx11-dev libfreetype6-dev
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        # brew install freetype  # Commented, github-macOS already has this
+
+    - name: Install dependencies (Windows/MSYS2)
+      if: runner.os == 'Windows'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64  # Recommended modern runtime; alternatives: MINGW64
+        update: true
+        install: >-
+          base-devel
+          mingw-w64-ucrt-x86_64-toolchain
+          mingw-w64-ucrt-x86_64-freetype
+
+    - name: Build with Makefile (Linux/Ubuntu)
+      if: runner.os == 'Linux'
+      run: make all
+
+    - name: Build with Makefile (macOS)
+      if: runner.os == 'macOS'
+      run: make all
+
+    - name: Build with Makefile (Windows)
+      if: runner.os == 'Windows'
+      shell: msys2 {0}
+      run: make all
+
+    - name: Checkout `nakst/gf` repository
+      if: runner.os == 'Linux' || runner.os == 'macOS'
+      uses: actions/checkout@v4
+      with:
+        repository: nakst/gf
+        path: gf
+
+    - name: Replace luigi2.h and build `gf` (Linux/Ununtu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get install -y gdb
+        rm -f gf/luigi2.h         # Delete luigi2.h
+        cp portgui.h gf/luigi2.h  # Replace with portgui.h
+        cd gf
+        ./build.sh                # Build gf
+
+    - name: Replace luigi2.h and build `gf` (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install gdb
+        rm -f gf/luigi2.h         # Delete luigi2.h
+        cp portgui.h gf/luigi2.h  # Replace with portgui.h
+        cd gf
+        ./build_macos.sh          # Build gf
