@@ -6866,10 +6866,10 @@ int (*_cocoaAppMain)(int, char **);
 int _cocoaArgc;
 char **_cocoaArgv;
 
-struct _UIPostedMessage {
+typedef struct _UIPostedMessage {
 	UIMessage message;
 	void *dp;
-};
+} _UIPostedMessage;
 
 char *_UIUTF8StringFromNSString(NSString *string) {
 	NSUInteger size = [string lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
