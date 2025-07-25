@@ -71,6 +71,7 @@ jobs:
         rm -f gf/luigi2.h         # Delete luigi2.h
         cp portgui.h gf/luigi2.h  # Replace with portgui.h
         cd gf
+        cp extensions_v5/extensions.cpp extensions.cpp  # Include extensions
         ./build.sh                # Build gf
 
     - name: Replace luigi2.h and build `gf` (macOS)
@@ -80,4 +81,5 @@ jobs:
         rm -f gf/luigi2.h         # Delete luigi2.h
         cp portgui.h gf/luigi2.h  # Replace with portgui.h
         cd gf
+        cp extensions_v5/extensions.cpp extensions.cpp  # Include extensions
         ./build_macos.sh          # Build gf
