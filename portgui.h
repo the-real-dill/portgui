@@ -5557,9 +5557,11 @@ void UIInspectorLog(const char *cFormat, ...) {
 	va_start(arguments, cFormat);
 	char buffer[4096];
 	vsnprintf(buffer, sizeof(buffer), cFormat, arguments);
-	UICodeInsertContent(ui.inspectorLog, buffer, -1, false);
 	va_end(arguments);
-	UIElementRefresh(&ui.inspectorLog->e);
+	if (ui.inspectorLog) {
+		UICodeInsertContent(ui.inspectorLog, buffer, -1, false);
+		UIElementRefresh(&ui.inspectorLog->e);
+	}
 }
 
 UIElement *_UIInspectorFindNthElement(UIElement *element, int *index, int *depth) {
