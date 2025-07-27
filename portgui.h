@@ -38,57 +38,27 @@
 #include <freetype/ftbitmap.h>
 #endif
 
-// NOTE: There is no need for this header to be included, and in fact it
-// shouldn't be. It was included in the luigi library, and `nakst/gf` relies
-// on it being included, as that application doesn't include the header.
-// It is left here for compatability. If you aren't building `nakst/gf`, you
-// can delete this. It may be removed in a future version.
+// NOTE: There is no need for these headers to be included, and in fact they
+// shouldn't be. They were included in the luigi library, and `nakst/gf` relies
+// on them being included, as that application doesn't include the headers.
+// They are left here for compatability. If you aren't building `nakst/gf`, you
+// can delete these. They may be removed in a future version.
 // -- DO NOT RELY ON THIS BEING INCLUDED FOR YOUR USE
 #include <assert.h> // Used by `nakst/gf`
+#include <math.h>   // Used by `nakst/gf` (extension_v5)
 
-#ifdef UI_DEBUG
-#include <stdio.h>
-#endif
-
-#ifdef UI_SSE2
-#if !defined(__i386__) && !defined(__x86_64__) && !defined(__amd64__)
-#pragma message("SSE2 is only available on x86/x64 architectures. Disabling.")
-#undef UI_SSE2
-#endif
-#endif
-
-#ifdef UI_SSE2
-#include <xmmintrin.h>
-#endif
-
-#if defined(UI_LINUX) || defined(UI_COCOA)
-#include <math.h>
-#endif
-
-#ifdef UI_LINUX
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xatom.h>
-#include <X11/cursorfont.h>
-#endif
-
+// NOTE & TODO: These platform specific headers are defined here because the
+// current `UIMenu` structs utilizes "native" menus on the MacOS/Cocoa and
+// Essence platforms, so the platform headers need to be available everywhere.
+// This will be changed in a future version, and these headers will be moved to
+// the respective implementation platform sections. ----------------------------
 #ifdef UI_COCOA
 #import <Foundation/Foundation.h>
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
 #endif
-
-#ifdef UI_WINDOWS
-#undef _UNICODE
-#undef UNICODE
-#include <windows.h>
-#endif
-
 #if defined(UI_ESSENCE)
 #include <essence.h>
-
-// Callback to allow the application to process messages.
-void _UIMessageProcess(EsMessage *message);
 #endif
 
 // =============================================================================
@@ -1273,6 +1243,42 @@ UITheme uiThemeDark = {
 	.accent1 = 0xF01231,
 	.accent2 = 0x45F94E,
 };
+
+// =============================================================================
+// == Internal/Private Header Includes and Definitions
+// =============================================================================
+
+#if defined(UI_DEBUG)
+#include <stdio.h> // fprintf, snprintf, vsnprintf (used in debug)
+#endif
+
+#ifdef UI_SSE2
+#if !defined(__i386__) && !defined(__x86_64__) && !defined(__amd64__)
+#pragma message("SSE2 is only available on x86/x64 architectures. Disabling.")
+#undef UI_SSE2
+#endif
+#endif
+
+#ifdef UI_SSE2
+#include <xmmintrin.h>
+#endif
+
+// TODO: The platform specific headers will be moved to their respective
+// platform sections once the platform-specific members of the global `ui`
+// struct are moved into an opaque struct. -------------------------------------
+
+#ifdef UI_LINUX
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/Xatom.h>
+#include <X11/cursorfont.h>
+#endif
+
+#ifdef UI_WINDOWS
+#undef _UNICODE
+#undef UNICODE
+#include <windows.h>
+#endif
 
 // =============================================================================
 // == Global State/Variables
@@ -7210,6 +7216,9 @@ int _UIWindowCanvasMessage(EsElement *element, EsMessage *message) {
 
 	return ES_HANDLED;
 }
+
+// HACK: Callback to allow the application to process messages. (See below.)
+void _UIMessageProcess(EsMessage *message);
 
 bool _UIMessageLoopSingle(int *result) {
 	if (ui.animating) {
