@@ -57,7 +57,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <time.h>
 #include <math.h>
 
 #define UI_ASSERT assert
@@ -65,9 +64,6 @@
 #define UI_FREE free
 #define UI_MALLOC malloc
 #define UI_REALLOC realloc
-#define UI_CLOCK _UIClock
-#define UI_CLOCKS_PER_SECOND 1000
-#define UI_CLOCK_T clock_t
 #define UI_MEMMOVE(d, s, n) do { size_t _n = n; if (_n) { memmove(d, s, _n); } } while (0)
 #endif
 
@@ -96,9 +92,6 @@
 #define UI_FREE(x) HeapFree(ui.heap, 0, (x))
 #define UI_MALLOC(x) HeapAlloc(ui.heap, 0, (x))
 #define UI_REALLOC _UIHeapReAlloc
-#define UI_CLOCK GetTickCount
-#define UI_CLOCKS_PER_SECOND (1000)
-#define UI_CLOCK_T DWORD
 #define UI_MEMMOVE _UIMemmove
 #endif
 
@@ -110,9 +103,6 @@
 #define UI_FREE EsHeapFree
 #define UI_MALLOC(x) EsHeapAllocate((x), false)
 #define UI_REALLOC(x, y) EsHeapReallocate((x), (y), false)
-#define UI_CLOCK EsTimeStampMs
-#define UI_CLOCKS_PER_SECOND 1000
-#define UI_CLOCK_T uint64_t
 #define UI_MEMMOVE EsCRTmemmove
 
 // Callback to allow the application to process messages.
@@ -122,6 +112,38 @@ void _UIMessageProcess(EsMessage *message);
 // =============================================================================
 // == Definitions
 // =============================================================================
+
+// -----------------------------------------------------------------------------
+// -- General Types/Enumerations/Definitions
+// -----------------------------------------------------------------------------
+
+// -- Clock/Timing
+
+// Each platform should return time values in the `UI_CLOCK_T` type, which as a
+// standard is `uint64_t`. However, _advanced users_ may want to provide their
+// own choice of type, so this is left definable. In general, use the defaults.
+
+#ifndef UI_CLOCK_T
+typedef uint64_t UI_CLOCK_T;
+#endif
+
+#ifndef UI_CLOCKS_PER_SECOND
+#define UI_CLOCKS_PER_SECOND (1000)
+#endif
+
+// -----------------------------------------------------------------------------
+// -- Platform Defined Functions (Preprocessor Definitions)
+// -----------------------------------------------------------------------------
+
+// These are defined this way so that the implementation can be changed by
+// per platform by providing the 'underscored' version, while also being able
+// to be replaced with other versions by advanced users through custom defines.
+
+// -- Clock/Timing
+
+#if !defined(UI_CLOCK_CUSTOM)
+#define UI_CLOCK _UIClock
+#endif
 
 // -----------------------------------------------------------------------------
 // -- Element Size
@@ -838,10 +860,18 @@ typedef struct UITableGetItem {
 void UIInitialise();
 int  UIMessageLoop();
 
-uint64_t UIAnimateClock(); // In ms.
+UI_CLOCK_T UIAnimateClock(); // In ms.
 
 #ifdef UI_DEBUG
 void UIInspectorLog(const char *cFormat, ...);
+#endif
+
+// -- Platform Defined Functions
+
+// DO NOT USE THESE DIRECTLY - USE THE MACROS.
+
+#if !defined(UI_CLOCK_CUSTOM)
+UI_CLOCK_T _UIClock();
 #endif
 
 // -----------------------------------------------------------------------------
@@ -1302,14 +1332,6 @@ char *_UIClipboardReadTextStart(UIWindow *window, size_t *bytes);
 void  _UIClipboardReadTextEnd(UIWindow *window, char *text);
 bool  _UIMessageLoopSingle(int *result);
 
-#if defined(UI_LINUX) || defined(UI_COCOA)
-UI_CLOCK_T _UIClock() {
-	struct timespec spec;
-	clock_gettime(CLOCK_REALTIME, &spec);
-	return spec.tv_sec * 1000 + spec.tv_nsec / 1000000;
-}
-#endif
-
 #ifdef UI_WINDOWS
 void  *_UIHeapReAlloc(void *pointer, size_t size);
 void  *_UIMemmove(void *dest, const void *src, size_t n);
@@ -1651,8 +1673,8 @@ void _UIUpdate() {
 	}
 }
 
-uint64_t UIAnimateClock() {
-	return (uint64_t) UI_CLOCK() * 1000 / UI_CLOCKS_PER_SECOND;
+UI_CLOCK_T UIAnimateClock() {
+	return (UI_CLOCK_T) (UI_CLOCK() * 1000 / UI_CLOCKS_PER_SECOND);
 }
 
 // =============================================================================
@@ -5755,6 +5777,27 @@ struct _UIOSWindowStruct {
 #endif
 };
 
+#if defined(UI_LINUX) || defined(UI_COCOA)
+// -----------------------------------------------------------------------------
+// -- Platform Layer: LINUX or MACOS/COCOA (Shared Code)
+// -----------------------------------------------------------------------------
+
+// -- Headers ------------------------------------------------------------------
+
+#include <time.h>   // timespec, clock_gettime
+
+// -- Functions ----------------------------------------------------------------
+
+// -- Clock/Timing
+
+UI_CLOCK_T _UIClock() {
+	struct timespec spec;
+	clock_gettime(CLOCK_REALTIME, &spec);
+	return (UI_CLOCK_T) (spec.tv_sec * 1000 + spec.tv_nsec / 1000000);
+}
+
+#endif // defined(UI_LINUX) || defined(UI_COCOA)
+
 #ifdef UI_LINUX
 // -----------------------------------------------------------------------------
 // -- Platform Layer: LINUX
@@ -6534,6 +6577,12 @@ const int UI_KEYCODE_PAGE_DOWN = VK_NEXT;
 
 // -- UI/Platform Required Infrastructure --------------------------------------
 
+// -- Clock/Timing
+
+UI_CLOCK_T _UIClock() { return (UI_CLOCK_T) GetTickCount(); }
+
+// -- Memory Management
+
 void *_UIHeapReAlloc(void *pointer, size_t size) {
 	if (pointer) {
 		if (size) {
@@ -6948,7 +6997,9 @@ const int UI_KEYCODE_PAGE_DOWN = ES_SCANCODE_PAGE_DOWN;
 
 // -- UI/Platform Required Infrastructure --------------------------------------
 
-// None so far on this platform...
+// -- Clock/Timing
+
+UI_CLOCK_T _UIClock() { return (UI_CLOCK_T) EsTimeStampMs(); }
 
 // -- Helpers ------------------------------------------------------------------
 
