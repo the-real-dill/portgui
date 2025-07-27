@@ -542,6 +542,9 @@ typedef struct UIElement {
 
 // -- Window Element -----------------------------------------------------------
 
+// Opaque struct containing platform-specific state/variables for UIWindow:
+typedef struct _UIOSWindowStruct _UIOSWindowStruct;
+
 typedef struct UIWindow {
 #define UI_WINDOW_MENU (1 << 0)
 #define UI_WINDOW_INSPECTOR (1 << 1)
@@ -578,29 +581,7 @@ typedef struct UIWindow {
 	float lastFullFillCount;
 #endif
 
-#ifdef UI_LINUX
-	Window window;
-	XImage *image;
-	XIC xic;
-	unsigned ctrlCode, shiftCode, altCode;
-	Window dragSource;
-#endif
-
-#ifdef UI_COCOA
-	NSWindow *window;
-	void *view;
-#endif
-
-#ifdef UI_WINDOWS
-	HWND hwnd;
-	bool trackingLeave;
-#endif
-
-#ifdef UI_ESSENCE
-	EsWindow *window;
-	EsElement *canvas;
-	int cursor;
-#endif
+	_UIOSWindowStruct *os;
 } UIWindow;
 
 // -- Basic Layout Elements ----------------------------------------------------
@@ -5745,6 +5726,35 @@ int UIMessageLoop() {
 #endif
 }
 
+// -- Platform-Specific Structs ------------------------------------------------
+
+// TODO: Consider moving this into respective 'Platform' sections?
+struct _UIOSWindowStruct {
+#ifdef UI_LINUX
+	Window window;
+	XImage *image;
+	XIC xic;
+	unsigned ctrlCode, shiftCode, altCode;
+	Window dragSource;
+#endif
+
+#ifdef UI_COCOA
+	NSWindow *window;
+	void *view;
+#endif
+
+#ifdef UI_WINDOWS
+	HWND hwnd;
+	bool trackingLeave;
+#endif
+
+#ifdef UI_ESSENCE
+	EsWindow *window;
+	EsElement *canvas;
+	int cursor;
+#endif
+};
+
 #ifdef UI_LINUX
 // -----------------------------------------------------------------------------
 // -- Platform Layer: LINUX
@@ -5784,7 +5794,7 @@ UIWindow *_UIFindWindow(Window window) {
 	UIWindow *w = ui.windows;
 
 	while (w) {
-		if (w->window == window) {
+		if (w->os->window == window) {
 			return w;
 		}
 
@@ -5796,15 +5806,15 @@ UIWindow *_UIFindWindow(Window window) {
 
 void _UIWindowGetScreenPosition(UIWindow *window, int *_x, int *_y) {
 	Window child;
-	XTranslateCoordinates(ui.display, window->window, DefaultRootWindow(ui.display), 0, 0, _x, _y, &child);
+	XTranslateCoordinates(ui.display, window->os->window, DefaultRootWindow(ui.display), 0, 0, _x, _y, &child);
 }
 
 void _UIWindowSetCursor(UIWindow *window, int cursor) {
-	XDefineCursor(ui.display, window->window, ui.cursors[cursor]);
+	XDefineCursor(ui.display, window->os->window, ui.cursors[cursor]);
 }
 
 void _UIX11ResetCursor(UIWindow *window) {
-	XDefineCursor(ui.display, window->window, ui.cursors[UI_CURSOR_ARROW]);
+	XDefineCursor(ui.display, window->os->window, ui.cursors[UI_CURSOR_ARROW]);
 }
 
 // -- Rendering ----------------------------------------------------------------
@@ -5812,7 +5822,7 @@ void _UIX11ResetCursor(UIWindow *window) {
 void _UIWindowEndPaint(UIWindow *window, UIPainter *painter) {
 	(void) painter;
 
-	XPutImage(ui.display, window->window, DefaultGC(ui.display, 0), window->image,
+	XPutImage(ui.display, window->os->window, DefaultGC(ui.display, 0), window->os->image,
 		UI_RECT_TOP_LEFT(window->updateRegion), UI_RECT_TOP_LEFT(window->updateRegion),
 		UI_RECT_SIZE(window->updateRegion));
 }
@@ -5884,7 +5894,7 @@ bool _UIProcessEvent(XEvent *event) {
 	} else if (event->type == Expose) {
 		UIWindow *window = _UIFindWindow(event->xexpose.window);
 		if (!window) return false;
-		XPutImage(ui.display, window->window, DefaultGC(ui.display, 0), window->image, 0, 0, 0, 0, window->width, window->height);
+		XPutImage(ui.display, window->os->window, DefaultGC(ui.display, 0), window->os->image, 0, 0, 0, 0, window->width, window->height);
 	} else if (event->type == ConfigureNotify) {
 		UIWindow *window = _UIFindWindow(event->xconfigure.window);
 		if (!window) return false;
@@ -5893,10 +5903,10 @@ bool _UIProcessEvent(XEvent *event) {
 			window->width = event->xconfigure.width;
 			window->height = event->xconfigure.height;
 			window->bits = (uint32_t *) UI_REALLOC(window->bits, window->width * window->height * 4);
-			window->image->width = window->width;
-			window->image->height = window->height;
-			window->image->bytes_per_line = window->width * 4;
-			window->image->data = (char *) window->bits;
+			window->os->image->width = window->width;
+			window->os->image->height = window->height;
+			window->os->image->bytes_per_line = window->width * 4;
+			window->os->image->data = (char *) window->bits;
 			window->e.bounds = UI_RECT_2S(window->width, window->height);
 			window->e.clip = UI_RECT_2S(window->width, window->height);
 #ifdef UI_DEBUG
@@ -5955,21 +5965,21 @@ bool _UIProcessEvent(XEvent *event) {
 			Status status;
 			// printf("%ld, %s\n", symbol, text);
 			UIKeyTyped m = { 0 };
-			m.textBytes = Xutf8LookupString(window->xic, &event->xkey, text, sizeof(text) - 1, &symbol, &status);
+			m.textBytes = Xutf8LookupString(window->os->xic, &event->xkey, text, sizeof(text) - 1, &symbol, &status);
 			m.text = text;
 			m.code = XLookupKeysym(&event->xkey, 0);
 
 			if (symbol == XK_Control_L || symbol == XK_Control_R) {
 				window->ctrl = true;
-				window->ctrlCode = event->xkey.keycode;
+				window->os->ctrlCode = event->xkey.keycode;
 				_UIWindowInputEvent(window, UI_MSG_MOUSE_MOVE, 0, 0);
 			} else if (symbol == XK_Shift_L || symbol == XK_Shift_R) {
 				window->shift = true;
-				window->shiftCode = event->xkey.keycode;
+				window->os->shiftCode = event->xkey.keycode;
 				_UIWindowInputEvent(window, UI_MSG_MOUSE_MOVE, 0, 0);
 			} else if (symbol == XK_Alt_L || symbol == XK_Alt_R) {
 				window->alt = true;
-				window->altCode = event->xkey.keycode;
+				window->os->altCode = event->xkey.keycode;
 				_UIWindowInputEvent(window, UI_MSG_MOUSE_MOVE, 0, 0);
 			} else if (symbol == XK_KP_Left) {
 				m.code = UI_KEYCODE_LEFT;
@@ -5999,13 +6009,13 @@ bool _UIProcessEvent(XEvent *event) {
 		UIWindow *window = _UIFindWindow(event->xkey.window);
 		if (!window) return false;
 
-		if (event->xkey.keycode == window->ctrlCode) {
+		if (event->xkey.keycode == window->os->ctrlCode) {
 			window->ctrl = false;
 			_UIWindowInputEvent(window, UI_MSG_MOUSE_MOVE, 0, 0);
-		} else if (event->xkey.keycode == window->shiftCode) {
+		} else if (event->xkey.keycode == window->os->shiftCode) {
 			window->shift = false;
 			_UIWindowInputEvent(window, UI_MSG_MOUSE_MOVE, 0, 0);
-		} else if (event->xkey.keycode == window->altCode) {
+		} else if (event->xkey.keycode == window->os->altCode) {
 			window->alt = false;
 			_UIWindowInputEvent(window, UI_MSG_MOUSE_MOVE, 0, 0);
 		} else {
@@ -6013,7 +6023,7 @@ bool _UIProcessEvent(XEvent *event) {
 			KeySym symbol = NoSymbol;
 			Status status;
 			UIKeyTyped m = { 0 };
-			m.textBytes = Xutf8LookupString(window->xic, &event->xkey, text, sizeof(text) - 1, &symbol, &status);
+			m.textBytes = Xutf8LookupString(window->os->xic, &event->xkey, text, sizeof(text) - 1, &symbol, &status);
 			m.text = text;
 			m.code = XLookupKeysym(&event->xkey, 0);
 			_UIWindowInputEvent(window, UI_MSG_KEY_RELEASED, 0, &m);
@@ -6029,7 +6039,7 @@ bool _UIProcessEvent(XEvent *event) {
 	} else if (event->type == ClientMessage && event->xclient.message_type == ui.dndEnterID) {
 		UIWindow *window = _UIFindWindow(event->xclient.window);
 		if (!window) return false;
-		window->dragSource = (Window) event->xclient.data.l[0];
+		window->os->dragSource = (Window) event->xclient.data.l[0];
 	} else if (event->type == ClientMessage && event->xclient.message_type == ui.dndPositionID) {
 		UIWindow *window = _UIFindWindow(event->xclient.window);
 		if (!window) return false;
@@ -6039,7 +6049,7 @@ bool _UIProcessEvent(XEvent *event) {
 		m.window = (Window) event->xclient.data.l[0];
 		m.message_type = ui.dndStatusID;
 		m.format = 32;
-		m.data.l[0] = window->window;
+		m.data.l[0] = window->os->window;
 		m.data.l[1] = true;
 		m.data.l[4] = ui.dndActionCopyID;
 		XSendEvent(ui.display, m.window, False, NoEventMask, (XEvent *) &m);
@@ -6050,14 +6060,14 @@ bool _UIProcessEvent(XEvent *event) {
 
 		// TODO Dropping text.
 
-		if (!XConvertSelection(ui.display, ui.dndSelectionID, ui.uriListID, ui.primaryID, window->window, event->xclient.data.l[2])) {
+		if (!XConvertSelection(ui.display, ui.dndSelectionID, ui.uriListID, ui.primaryID, window->os->window, event->xclient.data.l[2])) {
 			XClientMessageEvent m = { 0 };
 			m.type = ClientMessage;
 			m.display = ui.display;
-			m.window = window->dragSource;
+			m.window = window->os->dragSource;
 			m.message_type = ui.dndFinishedID;
 			m.format = 32;
-			m.data.l[0] = window->window;
+			m.data.l[0] = window->os->window;
 			m.data.l[1] = 0;
 			m.data.l[2] = ui.dndActionCopyID;
 			XSendEvent(ui.display, m.window, False, NoEventMask, (XEvent *) &m);
@@ -6066,13 +6076,13 @@ bool _UIProcessEvent(XEvent *event) {
 	} else if (event->type == SelectionNotify) {
 		UIWindow *window = _UIFindWindow(event->xselection.requestor);
 		if (!window) return false;
-		if (!window->dragSource) return false;
+		if (!window->os->dragSource) return false;
 
 		Atom type = None;
 		int format = 0;
 		unsigned long count = 0, bytesLeft = 0;
 		uint8_t *data = NULL;
-		XGetWindowProperty(ui.display, window->window, ui.primaryID, 0, 65536, False, AnyPropertyType, &type, &format, &count, &bytesLeft, &data);
+		XGetWindowProperty(ui.display, window->os->window, ui.primaryID, 0, 65536, False, AnyPropertyType, &type, &format, &count, &bytesLeft, &data);
 
 		if (format == 8 /* bits per character */) {
 			if (event->xselection.target == ui.uriListID) {
@@ -6124,22 +6134,22 @@ bool _UIProcessEvent(XEvent *event) {
 		XClientMessageEvent m = { 0 };
 		m.type = ClientMessage;
 		m.display = ui.display;
-		m.window = window->dragSource;
+		m.window = window->os->dragSource;
 		m.message_type = ui.dndFinishedID;
 		m.format = 32;
-		m.data.l[0] = window->window;
+		m.data.l[0] = window->os->window;
 		m.data.l[1] = true;
 		m.data.l[2] = ui.dndActionCopyID;
 		XSendEvent(ui.display, m.window, False, NoEventMask, (XEvent *) &m);
 		XFlush(ui.display);
 
-		window->dragSource = 0; // Drag complete.
+		window->os->dragSource = 0; // Drag complete.
 		_UIUpdate();
 	} else if (event->type == SelectionRequest) {
 		UIWindow *window = _UIFindWindow(event->xclient.window);
 		if (!window) return false;
 
-		if ((XGetSelectionOwner(ui.display, ui.clipboardID) == window->window)
+		if ((XGetSelectionOwner(ui.display, ui.clipboardID) == window->os->window)
 				&& (event->xselectionrequest.selection == ui.clipboardID)) {
 			XSelectionRequestEvent requestEvent = event->xselectionrequest;
 			Atom utf8ID = XInternAtom(ui.display, "UTF8_STRING", 1);
@@ -6229,10 +6239,10 @@ int _UIWindowMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	if (message == UI_MSG_DEALLOCATE) {
 		UIWindow *window = (UIWindow *) element;
 		_UIWindowDestroyCommon(window);
-		window->image->data = NULL;
-		XDestroyImage(window->image);
-		XDestroyIC(window->xic);
-		XDestroyWindow(ui.display, ((UIWindow *) element)->window);
+		window->os->image->data = NULL;
+		XDestroyImage(window->os->image);
+		XDestroyIC(window->os->xic);
+		XDestroyWindow(ui.display, window->os->window);
 	}
 
 	return _UIWindowMessageCommon(element, message, di, dp);
@@ -6245,7 +6255,7 @@ void UIWindowPostMessage(UIWindow *window, UIMessage message, void *_dp) {
 	uintptr_t dp = (uintptr_t) _dp;
 	XKeyEvent event = { 0 };
 	event.display = ui.display;
-	event.window = window->window;
+	event.window = window->os->window;
 	event.root = DefaultRootWindow(ui.display);
 	event.subwindow = None;
 #if INTPTR_MAX == INT64_MAX
@@ -6259,7 +6269,7 @@ void UIWindowPostMessage(UIWindow *window, UIMessage message, void *_dp) {
 	event.keycode = 1;
 	event.state = message;
 	event.type = KeyPress;
-	XSendEvent(ui.display, window->window, True, KeyPressMask, (XEvent *) &event);
+	XSendEvent(ui.display, window->os->window, True, KeyPressMask, (XEvent *) &event);
 	XFlush(ui.display);
 }
 
@@ -6269,7 +6279,11 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 	_UIMenusClose();
 
 	UIWindow *window = (UIWindow *) UIElementCreate(sizeof(UIWindow), NULL, flags | UI_ELEMENT_WINDOW, _UIWindowMessage, "Window");
+	_UIOSWindowStruct *osStruct = (_UIOSWindowStruct *) UI_MALLOC(sizeof(_UIOSWindowStruct));
+	window->os = osStruct;
+
 	_UIWindowAdd(window);
+
 	if (owner) window->scale = owner->scale;
 
 	int width = (flags & UI_WINDOW_MENU) ? 1 : _width ? _width : 800;
@@ -6280,40 +6294,40 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 
 	char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
 	if (xdg_current_desktop && strcmp(xdg_current_desktop, "Hyprland") == 0) {
-		window->window = XCreateWindow(ui.display, DefaultRootWindow(ui.display), 0, 0, width, height, 1, 0,
+		window->os->window = XCreateWindow(ui.display, DefaultRootWindow(ui.display), 0, 0, width, height, 1, 0,
 			InputOutput, CopyFromParent, CWOverrideRedirect, &attributes);
-		XSetWindowBorderWidth(ui.display, window->window, 0);
+		XSetWindowBorderWidth(ui.display, window->os->window, 0);
 	} else {
-		window->window = XCreateWindow(ui.display, DefaultRootWindow(ui.display), 0, 0, width, height, 0, 0,
+		window->os->window = XCreateWindow(ui.display, DefaultRootWindow(ui.display), 0, 0, width, height, 0, 0,
 			InputOutput, CopyFromParent, CWOverrideRedirect, &attributes);
 	}
-	if (cTitle) XStoreName(ui.display, window->window, cTitle);
-	XSelectInput(ui.display, window->window, SubstructureNotifyMask | ExposureMask | PointerMotionMask
+	if (cTitle) XStoreName(ui.display, window->os->window, cTitle);
+	XSelectInput(ui.display, window->os->window, SubstructureNotifyMask | ExposureMask | PointerMotionMask
 		| ButtonPressMask | ButtonReleaseMask | KeyPressMask | KeyReleaseMask | StructureNotifyMask
 		| EnterWindowMask | LeaveWindowMask | ButtonMotionMask | KeymapStateMask | FocusChangeMask | PropertyChangeMask);
 
 	if (flags & UI_WINDOW_MAXIMIZE) {
 		Atom atoms[2] = { XInternAtom(ui.display, "_NET_WM_STATE_MAXIMIZED_HORZ", 0), XInternAtom(ui.display, "_NET_WM_STATE_MAXIMIZED_VERT", 0) };
-		XChangeProperty(ui.display, window->window, XInternAtom(ui.display, "_NET_WM_STATE", 0), XA_ATOM, 32, PropModeReplace, (unsigned char *) atoms, 2);
+		XChangeProperty(ui.display, window->os->window, XInternAtom(ui.display, "_NET_WM_STATE", 0), XA_ATOM, 32, PropModeReplace, (unsigned char *) atoms, 2);
 	}
 
 	if (~flags & UI_WINDOW_MENU) {
-		XMapRaised(ui.display, window->window);
+		XMapRaised(ui.display, window->os->window);
 	}
 
 	if (flags & UI_WINDOW_CENTER_IN_OWNER) {
 		int x = 0, y = 0;
 		_UIWindowGetScreenPosition(owner, &x, &y);
-		XMoveResizeWindow(ui.display, window->window, x + owner->width / 2 - width / 2, y + owner->height / 2 - height / 2, width, height);
+		XMoveResizeWindow(ui.display, window->os->window, x + owner->width / 2 - width / 2, y + owner->height / 2 - height / 2, width, height);
 	}
 
-	XSetWMProtocols(ui.display, window->window, &ui.windowClosedID, 1);
-	window->image = XCreateImage(ui.display, ui.visual, 24, ZPixmap, 0, NULL, 10, 10, 32, 0);
+	XSetWMProtocols(ui.display, window->os->window, &ui.windowClosedID, 1);
+	window->os->image = XCreateImage(ui.display, ui.visual, 24, ZPixmap, 0, NULL, 10, 10, 32, 0);
 
-	window->xic = XCreateIC(ui.xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, window->window, XNFocusWindow, window->window, NULL);
+	window->os->xic = XCreateIC(ui.xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, window->os->window, XNFocusWindow, window->os->window, NULL);
 
 	int dndVersion = 4;
-	XChangeProperty(ui.display, window->window, ui.dndAwareID, XA_ATOM, 32 /* bits */, PropModeReplace, (uint8_t *) &dndVersion, 1);
+	XChangeProperty(ui.display, window->os->window, ui.dndAwareID, XA_ATOM, 32 /* bits */, PropModeReplace, (uint8_t *) &dndVersion, 1);
 
 	return window;
 }
@@ -6321,7 +6335,7 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 void UIWindowPack(UIWindow *window, int _width) {
 	int width = _width ? _width : UIElementMessage(window->e.children[0], UI_MSG_GET_WIDTH, 0, 0);
 	int height = UIElementMessage(window->e.children[0], UI_MSG_GET_HEIGHT, width, 0);
-	XResizeWindow(ui.display, window->window, width, height);
+	XResizeWindow(ui.display, window->os->window, width, height);
 }
 
 // -- Menu Handling ------------------------------------------------------------
@@ -6353,7 +6367,7 @@ void UIMenuShow(UIMenu *menu) {
 		// This step shouldn't be necessary with the screen clamping below, but there are some buggy X11 drivers that report screen sizes incorrectly.
 		int wx, wy;
 		UIWindow *parentWindow = menu->parentWindow;
-		XTranslateCoordinates(ui.display, parentWindow->window, DefaultRootWindow(ui.display), 0, 0, &wx, &wy, &child);
+		XTranslateCoordinates(ui.display, parentWindow->os->window, DefaultRootWindow(ui.display), 0, 0, &wx, &wy, &child);
 		if (menu->pointX + width > wx + parentWindow->width) menu->pointX = wx + parentWindow->width - width;
 		if (menu->pointY + height > wy + parentWindow->height) menu->pointY = wy + parentWindow->height - height;
 		if (menu->pointX < wx) menu->pointX = wx;
@@ -6376,8 +6390,8 @@ void UIMenuShow(UIMenu *menu) {
 		XInternAtom(ui.display, "_MOTIF_WM_HINTS", true),
 	};
 
-	XChangeProperty(ui.display, menu->e.window->window, properties[0], XA_ATOM, 32, PropModeReplace, (uint8_t *) properties, 2);
-	XSetTransientForHint(ui.display, menu->e.window->window, DefaultRootWindow(ui.display));
+	XChangeProperty(ui.display, menu->e.window->os->window, properties[0], XA_ATOM, 32, PropModeReplace, (uint8_t *) properties, 2);
+	XSetTransientForHint(ui.display, menu->e.window->os->window, DefaultRootWindow(ui.display));
 
 	struct Hints {
 		int flags;
@@ -6389,10 +6403,10 @@ void UIMenuShow(UIMenu *menu) {
 
 	struct Hints hints = { 0 };
 	hints.flags = 2;
-	XChangeProperty(ui.display, menu->e.window->window, properties[2], properties[2], 32, PropModeReplace, (uint8_t *) &hints, 5);
+	XChangeProperty(ui.display, menu->e.window->os->window, properties[2], properties[2], 32, PropModeReplace, (uint8_t *) &hints, 5);
 
-	XMapWindow(ui.display, menu->e.window->window);
-	XMoveResizeWindow(ui.display, menu->e.window->window, menu->pointX, menu->pointY, width, height);
+	XMapWindow(ui.display, menu->e.window->os->window);
+	XMoveResizeWindow(ui.display, menu->e.window->os->window, menu->pointX, menu->pointY, width, height);
 }
 
 // -- Clipboard Handling -------------------------------------------------------
@@ -6400,7 +6414,7 @@ void UIMenuShow(UIMenu *menu) {
 void _UIClipboardWriteText(UIWindow *window, char *text) {
 	UI_FREE(ui.pasteText);
 	ui.pasteText = text;
-	XSetSelectionOwner(ui.display, ui.clipboardID, window->window, 0);
+	XSetSelectionOwner(ui.display, ui.clipboardID, window->os->window, 0);
 }
 
 char *_UIClipboardReadTextStart(UIWindow *window, size_t *bytes) {
@@ -6417,7 +6431,7 @@ char *_UIClipboardReadTextStart(UIWindow *window, size_t *bytes) {
 		return copy;
 	}
 
-	XConvertSelection(ui.display, ui.clipboardID, XA_STRING, ui.xSelectionDataID, window->window, CurrentTime);
+	XConvertSelection(ui.display, ui.clipboardID, XA_STRING, ui.xSelectionDataID, window->os->window, CurrentTime);
 	XSync(ui.display, 0);
 	XNextEvent(ui.display, &ui.copyEvent);
 
@@ -6569,7 +6583,7 @@ void _UIWindowGetScreenPosition(UIWindow *window, int *_x, int *_y) {
 	POINT p;
 	p.x = 0;
 	p.y = 0;
-	ClientToScreen(window->hwnd, &p);
+	ClientToScreen(window->os->hwnd, &p);
 	*_x = p.x;
 	*_y = p.y;
 }
@@ -6577,7 +6591,7 @@ void _UIWindowGetScreenPosition(UIWindow *window, int *_x, int *_y) {
 // -- Rendering ----------------------------------------------------------------
 
 void _UIWindowEndPaint(UIWindow *window, UIPainter *painter) {
-	HDC dc = GetDC(window->hwnd);
+	HDC dc = GetDC(window->os->hwnd);
 	BITMAPINFOHEADER info = { 0 };
 	info.biSize = sizeof(info);
 	info.biWidth = window->width, info.biHeight = window->height;
@@ -6587,7 +6601,7 @@ void _UIWindowEndPaint(UIWindow *window, UIPainter *painter) {
 		window->updateRegion.l, window->updateRegion.b + 1,
 		UI_RECT_WIDTH(window->updateRegion), -UI_RECT_HEIGHT(window->updateRegion),
 		window->bits, (BITMAPINFO *) &info, DIB_RGB_COLORS, SRCCOPY);
-	ReleaseDC(window->hwnd, dc);
+	ReleaseDC(window->os->hwnd, dc);
 }
 
 // -- Initialisation -----------------------------------------------------------
@@ -6649,8 +6663,8 @@ LRESULT CALLBACK _UIWindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPAR
 		UIElementRelayout(&window->e);
 		_UIUpdate();
 	} else if (message == WM_MOUSEMOVE) {
-		if (!window->trackingLeave) {
-			window->trackingLeave = true;
+		if (!window->os->trackingLeave) {
+			window->os->trackingLeave = true;
 			TRACKMOUSEEVENT leave = { 0 };
 			leave.cbSize = sizeof(TRACKMOUSEEVENT);
 			leave.dwFlags = TME_LEAVE;
@@ -6665,7 +6679,7 @@ LRESULT CALLBACK _UIWindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPAR
 		window->cursorY = cursor.y;
 		_UIWindowInputEvent(window, UI_MSG_MOUSE_MOVE, 0, 0);
 	} else if (message == WM_MOUSELEAVE) {
-		window->trackingLeave = false;
+		window->os->trackingLeave = false;
 
 		if (!window->pressed) {
 			window->cursorX = -1;
@@ -6796,15 +6810,15 @@ int _UIWindowMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	if (message == UI_MSG_DEALLOCATE) {
 		UIWindow *window = (UIWindow *) element;
 		_UIWindowDestroyCommon(window);
-		SetWindowLongPtr(window->hwnd, GWLP_USERDATA, 0);
-		DestroyWindow(window->hwnd);
+		SetWindowLongPtr(window->os->hwnd, GWLP_USERDATA, 0);
+		DestroyWindow(window->os->hwnd);
 	}
 
 	return _UIWindowMessageCommon(element, message, di, dp);
 }
 
 void UIWindowPostMessage(UIWindow *window, UIMessage message, void *_dp) {
-	PostMessage(window->hwnd, WM_APP + 1, (WPARAM) message, (LPARAM) _dp);
+	PostMessage(window->os->hwnd, WM_APP + 1, (WPARAM) message, (LPARAM) _dp);
 }
 
 // -- Window Handling ----------------------------------------------------------
@@ -6813,25 +6827,29 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 	_UIMenusClose();
 
 	UIWindow *window = (UIWindow *) UIElementCreate(sizeof(UIWindow), NULL, flags | UI_ELEMENT_WINDOW, _UIWindowMessage, "Window");
+	_UIOSWindowStruct *osStruct = (_UIOSWindowStruct *) UI_MALLOC(sizeof(_UIOSWindowStruct));
+	window->os = osStruct;
+
 	_UIWindowAdd(window);
+
 	if (owner) window->scale = owner->scale;
 
 	if (flags & UI_WINDOW_MENU) {
 		UI_ASSERT(owner);
 
-		window->hwnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_NOACTIVATE, "shadow", 0, WS_POPUP,
-			0, 0, 0, 0, owner->hwnd, NULL, NULL, NULL);
+		window->os->hwnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_NOACTIVATE, "shadow", 0, WS_POPUP,
+			0, 0, 0, 0, owner->os->hwnd, NULL, NULL, NULL);
 	} else {
-		window->hwnd = CreateWindowEx(WS_EX_ACCEPTFILES, "normal", cTitle, WS_OVERLAPPEDWINDOW,
+		window->os->hwnd = CreateWindowEx(WS_EX_ACCEPTFILES, "normal", cTitle, WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT, width ? width : CW_USEDEFAULT, height ? height : CW_USEDEFAULT,
-			owner ? owner->hwnd : NULL, NULL, NULL, NULL);
+			owner ? owner->os->hwnd : NULL, NULL, NULL, NULL);
 	}
 
-	SetWindowLongPtr(window->hwnd, GWLP_USERDATA, (LONG_PTR) window);
+	SetWindowLongPtr(window->os->hwnd, GWLP_USERDATA, (LONG_PTR) window);
 
 	if (~flags & UI_WINDOW_MENU) {
-		ShowWindow(window->hwnd, SW_SHOW);
-		PostMessage(window->hwnd, WM_SIZE, 0, 0);
+		ShowWindow(window->os->hwnd, SW_SHOW);
+		PostMessage(window->os->hwnd, WM_SIZE, 0, 0);
 	}
 
 	return window;
@@ -6842,14 +6860,14 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 void UIMenuShow(UIMenu *menu) {
 	int width, height;
 	_UIMenuPrepare(menu, &width, &height);
-	MoveWindow(menu->e.window->hwnd, menu->pointX, menu->pointY, width, height, FALSE);
-	ShowWindow(menu->e.window->hwnd, SW_SHOWNOACTIVATE);
+	MoveWindow(menu->e.window->os->hwnd, menu->pointX, menu->pointY, width, height, FALSE);
+	ShowWindow(menu->e.window->os->hwnd, SW_SHOWNOACTIVATE);
 }
 
 // -- Clipboard Handling -------------------------------------------------------
 
 void _UIClipboardWriteText(UIWindow *window, char *text) {
-	if (OpenClipboard(window->hwnd)) {
+	if (OpenClipboard(window->os->hwnd)) {
 		EmptyClipboard();
 		HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, _UIStringLength(text) + 1);
 		char *copy = (char *) GlobalLock(memory);
@@ -6861,7 +6879,7 @@ void _UIClipboardWriteText(UIWindow *window, char *text) {
 }
 
 char *_UIClipboardReadTextStart(UIWindow *window, size_t *bytes) {
-	if (!OpenClipboard(window->hwnd)) {
+	if (!OpenClipboard(window->os->hwnd)) {
 		return NULL;
 	}
 
@@ -6935,18 +6953,18 @@ const int UI_KEYCODE_PAGE_DOWN = ES_SCANCODE_PAGE_DOWN;
 // -- Helpers ------------------------------------------------------------------
 
 void _UIWindowGetScreenPosition(UIWindow *window, int *_x, int *_y) {
-	EsRectangle r = EsElementGetScreenBounds(window->window);
+	EsRectangle r = EsElementGetScreenBounds(window->os->window);
 	*_x = r.l, *_y = r.t;
 }
 
 void _UIWindowSetCursor(UIWindow *window, int cursor) {
-	window->cursor = cursor;
+	window->os->cursor = cursor;
 }
 
 // -- Rendering ----------------------------------------------------------------
 
 void _UIWindowEndPaint(UIWindow *window, UIPainter *painter) {
-	EsElementRepaint(window->canvas, &window->updateRegion);
+	EsElementRepaint(window->os->canvas, &window->updateRegion);
 }
 
 // -- Initialisation -----------------------------------------------------------
@@ -6967,7 +6985,7 @@ void UIInitialise() {
 // -- Message Handling ---------------------------------------------------------
 
 int _UIWindowCanvasMessage(EsElement *element, EsMessage *message) {
-	UIWindow *window = (UIWindow *) element->window->userData.p;
+	UIWindow *window = (UIWindow *) element->os->window->userData.p;
 
 	if (!window) {
 		return 0;
@@ -7009,20 +7027,20 @@ int _UIWindowCanvasMessage(EsElement *element, EsMessage *message) {
 		_UIUpdate();
 	} else if (message->type == ES_MSG_GET_CURSOR) {
 		message->cursorStyle = ES_CURSOR_NORMAL;
-		if (window->cursor == UI_CURSOR_TEXT)              message->cursorStyle = ES_CURSOR_TEXT;
-		if (window->cursor == UI_CURSOR_SPLIT_V)           message->cursorStyle = ES_CURSOR_SPLIT_VERTICAL;
-		if (window->cursor == UI_CURSOR_SPLIT_H)           message->cursorStyle = ES_CURSOR_SPLIT_HORIZONTAL;
-		if (window->cursor == UI_CURSOR_FLIPPED_ARROW)     message->cursorStyle = ES_CURSOR_SELECT_LINES;
-		if (window->cursor == UI_CURSOR_CROSS_HAIR)        message->cursorStyle = ES_CURSOR_CROSS_HAIR_PICK;
-		if (window->cursor == UI_CURSOR_HAND)              message->cursorStyle = ES_CURSOR_HAND_HOVER;
-		if (window->cursor == UI_CURSOR_RESIZE_UP)         message->cursorStyle = ES_CURSOR_RESIZE_VERTICAL;
-		if (window->cursor == UI_CURSOR_RESIZE_LEFT)       message->cursorStyle = ES_CURSOR_RESIZE_HORIZONTAL;
-		if (window->cursor == UI_CURSOR_RESIZE_UP_RIGHT)   message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_1;
-		if (window->cursor == UI_CURSOR_RESIZE_UP_LEFT)    message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_2;
-		if (window->cursor == UI_CURSOR_RESIZE_DOWN)       message->cursorStyle = ES_CURSOR_RESIZE_VERTICAL;
-		if (window->cursor == UI_CURSOR_RESIZE_RIGHT)      message->cursorStyle = ES_CURSOR_RESIZE_HORIZONTAL;
-		if (window->cursor == UI_CURSOR_RESIZE_DOWN_RIGHT) message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_1;
-		if (window->cursor == UI_CURSOR_RESIZE_DOWN_LEFT)  message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_2;
+		if (window->os->cursor == UI_CURSOR_TEXT)              message->cursorStyle = ES_CURSOR_TEXT;
+		if (window->os->cursor == UI_CURSOR_SPLIT_V)           message->cursorStyle = ES_CURSOR_SPLIT_VERTICAL;
+		if (window->os->cursor == UI_CURSOR_SPLIT_H)           message->cursorStyle = ES_CURSOR_SPLIT_HORIZONTAL;
+		if (window->os->cursor == UI_CURSOR_FLIPPED_ARROW)     message->cursorStyle = ES_CURSOR_SELECT_LINES;
+		if (window->os->cursor == UI_CURSOR_CROSS_HAIR)        message->cursorStyle = ES_CURSOR_CROSS_HAIR_PICK;
+		if (window->os->cursor == UI_CURSOR_HAND)              message->cursorStyle = ES_CURSOR_HAND_HOVER;
+		if (window->os->cursor == UI_CURSOR_RESIZE_UP)         message->cursorStyle = ES_CURSOR_RESIZE_VERTICAL;
+		if (window->os->cursor == UI_CURSOR_RESIZE_LEFT)       message->cursorStyle = ES_CURSOR_RESIZE_HORIZONTAL;
+		if (window->os->cursor == UI_CURSOR_RESIZE_UP_RIGHT)   message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_1;
+		if (window->os->cursor == UI_CURSOR_RESIZE_UP_LEFT)    message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_2;
+		if (window->os->cursor == UI_CURSOR_RESIZE_DOWN)       message->cursorStyle = ES_CURSOR_RESIZE_VERTICAL;
+		if (window->os->cursor == UI_CURSOR_RESIZE_RIGHT)      message->cursorStyle = ES_CURSOR_RESIZE_HORIZONTAL;
+		if (window->os->cursor == UI_CURSOR_RESIZE_DOWN_RIGHT) message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_1;
+		if (window->os->cursor == UI_CURSOR_RESIZE_DOWN_LEFT)  message->cursorStyle = ES_CURSOR_RESIZE_DIAGONAL_2;
 	}
 
 	else if (message->type == ES_MSG_MOUSE_LEFT_DOWN)   _UIWindowInputEvent(window, UI_MSG_LEFT_DOWN, 0, 0);
@@ -7062,7 +7080,7 @@ void UIWindowPostMessage(UIWindow *window, UIMessage message, void *_dp) {
 	m.type = ES_MSG_USER_START;
 	m.user.context1.u = message;
 	m.user.context2.p = _dp;
-	EsMessagePost(window->canvas, &m);
+	EsMessagePost(window->os->canvas, &m);
 }
 
 // -- Window Handling ----------------------------------------------------------
@@ -7071,19 +7089,23 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 	_UIMenusClose();
 
 	UIWindow *window = (UIWindow *) UIElementCreate(sizeof(UIWindow), NULL, flags | UI_ELEMENT_WINDOW, _UIWindowMessage, "Window");
+	_UIOSWindowStruct *osStruct = (_UIOSWindowStruct *) UI_MALLOC(sizeof(_UIOSWindowStruct));
+	window->os = osStruct;
+
 	_UIWindowAdd(window);
+
 	if (owner) window->scale = owner->scale;
 
 	if (flags & UI_WINDOW_MENU) {
 		// TODO.
 	} else {
 		// TODO Non-main windows.
-		window->window = ui.instance->window;
-		window->window->userData = window;
-		window->canvas = EsCustomElementCreate(window->window, ES_CELL_FILL | ES_ELEMENT_FOCUSABLE);
-		window->canvas->messageUser = _UIWindowCanvasMessage;
-		EsWindowSetTitle(window->window, cTitle, -1);
-		EsElementFocus(window->canvas);
+		window->os->window = ui.instance->window;
+		window->os->window->userData = window;
+		window->os->canvas = EsCustomElementCreate(window->os->window, ES_CELL_FILL | ES_ELEMENT_FOCUSABLE);
+		window->os->canvas->messageUser = _UIWindowCanvasMessage;
+		EsWindowSetTitle(window->os->window, cTitle, -1);
+		EsElementFocus(window->os->canvas);
 	}
 
 	return window;
@@ -7097,7 +7119,7 @@ void _UIMenuItemCallback(EsMenu *menu, EsGeneric context) {
 
 UIMenu *UIMenuCreate(UIElement *parent, uint32_t flags) {
 	ui.menuIndex = 0;
-	return EsMenuCreate(parent->window->window, ES_MENU_AT_CURSOR);
+	return EsMenuCreate(parent->window->os->window, ES_MENU_AT_CURSOR);
 }
 
 void UIMenuAddItem(UIMenu *menu, uint32_t flags, const char *label, ptrdiff_t labelBytes, void (*invoke)(void *cp), void *cp) {
@@ -7268,8 +7290,8 @@ char *_UIUTF8StringFromNSString(NSString *string) {
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
-	_uiWindow->width  = ((UICocoaMainView *) _uiWindow->view).frame.size.width;
-	_uiWindow->height = ((UICocoaMainView *) _uiWindow->view).frame.size.height;
+	_uiWindow->width  = ((UICocoaMainView *) _uiWindow->os->view).frame.size.width;
+	_uiWindow->height = ((UICocoaMainView *) _uiWindow->os->view).frame.size.height;
 	_uiWindow->bits = (uint32_t *) UI_REALLOC(_uiWindow->bits, _uiWindow->width * _uiWindow->height * 4);
 	_uiWindow->e.bounds = UI_RECT_2S(_uiWindow->width, _uiWindow->height);
 	_uiWindow->e.clip = UI_RECT_2S(_uiWindow->width, _uiWindow->height);
@@ -7380,7 +7402,7 @@ char *_UIUTF8StringFromNSString(NSString *string) {
 // -- Helpers ------------------------------------------------------------------
 
 void _UIWindowGetScreenPosition(UIWindow *window, int *x, int *y) {
-	NSPoint point = [window->window convertPointToScreen:NSMakePoint(0, 0)];
+	NSPoint point = [window->os->window convertPointToScreen:NSMakePoint(0, 0)];
 	*x = point.x, *y = point.y;
 }
 
@@ -7404,7 +7426,7 @@ void _UIWindowEndPaint(UIWindow *window, UIPainter *painter) {
 		}
 	}
 
-	[(UICocoaMainView *)window->view setNeedsDisplayInRect:((UICocoaMainView *)window->view).frame];
+	[(UICocoaMainView *)window->os->view setNeedsDisplayInRect:((UICocoaMainView *)window->os->view).frame];
 }
 
 // -- Initialisation -----------------------------------------------------------
@@ -7431,7 +7453,7 @@ int _UIWindowMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	if (message == UI_MSG_DEALLOCATE) {
 		UIWindow *window = (UIWindow *) element;
 		_UIWindowDestroyCommon(window);
-		[window->window close];
+		[window->os->window close];
 	}
 
 	return _UIWindowMessageCommon(element, message, di, dp);
@@ -7441,15 +7463,20 @@ void UIWindowPostMessage(UIWindow *window, UIMessage _message, void *dp) {
 	_UIPostedMessage *message = (_UIPostedMessage *) UI_MALLOC(sizeof(_UIPostedMessage));
 	message->message = _message;
 	message->dp = dp;
-	[(UICocoaMainView*)window->view performSelectorOnMainThread:@selector(handlePostedMessage:) withObject:(id)message waitUntilDone:NO];
+	[(UICocoaMainView*)window->os->view performSelectorOnMainThread:@selector(handlePostedMessage:) withObject:(id)message waitUntilDone:NO];
 }
 
 // -- Window Handling ----------------------------------------------------------
 
 UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, int _width, int _height) {
 	_UIMenusClose();
+
 	UIWindow *window = (UIWindow *) UIElementCreate(sizeof(UIWindow), NULL, flags | UI_ELEMENT_WINDOW, _UIWindowMessage, "Window");
+	_UIOSWindowStruct *osStruct = (_UIOSWindowStruct *) UI_MALLOC(sizeof(_UIOSWindowStruct));
+	window->os = osStruct;
+
 	_UIWindowAdd(window);
+
 	if (owner) window->scale = owner->scale;
 
 	NSRect frame = NSMakeRect(0, 0, _width ?: 800, _height ?: 600);
@@ -7461,8 +7488,8 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 	[delegate setUiWindow:window];
 	nsWindow.delegate = delegate;
 	UICocoaMainView *view = [UICocoaMainView alloc];
-	window->window = nsWindow;
-	window->view = view;
+	window->os->window = nsWindow;
+	window->os->view = view;
 	window->width = frame.size.width;
 	window->height = frame.size.height;
 	window->bits = (uint32_t *) UI_REALLOC(window->bits, window->width * window->height * 4);
@@ -7484,7 +7511,7 @@ UIWindow *UIWindowCreate(UIWindow *owner, uint32_t flags, const char *cTitle, in
 void UIWindowPack(UIWindow *window, int _width) {
 	int width = _width ? _width : UIElementMessage(window->e.children[0], UI_MSG_GET_WIDTH, 0, 0);
 	int height = UIElementMessage(window->e.children[0], UI_MSG_GET_HEIGHT, width, 0);
-	[window->window setContentSize:NSMakeSize(width, height)];
+	[window->os->window setContentSize:NSMakeSize(width, height)];
 }
 
 // -- Menu Handling ------------------------------------------------------------
@@ -7519,7 +7546,7 @@ void UIMenuAddItem(UIMenu *menu, uint32_t flags, const char *label, ptrdiff_t la
 	item.tag = ui.menuIndex++;
 	if (flags & UI_BUTTON_CHECKED) [item setState:NSControlStateValueOn];
 	[item setEnabled:((flags & UI_ELEMENT_DISABLED) ? NO : YES)];
-	[item setTarget:(UICocoaMainView *)ui.menuWindow->view];
+	[item setTarget:(UICocoaMainView *)ui.menuWindow->os->view];
 	[menu addItem:item];
 	[title release];
 	[item release];
