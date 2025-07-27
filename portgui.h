@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <stdarg.h> // variable arguments (UIDialog, UI_DEBUG)
+#include <stdarg.h> // variable arguments (UIDialog, UI_DEBUG, UI_LOGGING)
 
 // For Freetype support:
 #ifdef UI_FREETYPE
@@ -64,6 +64,14 @@
 // =============================================================================
 // == Definitions
 // =============================================================================
+
+// -----------------------------------------------------------------------------
+// -- Compile Mode Settings
+// -----------------------------------------------------------------------------
+
+#if defined(UI_DEBUG) && !defined(UI_LOGGING)
+#define UI_LOGGING
+#endif
 
 // -----------------------------------------------------------------------------
 // -- General Types/Enumerations/Definitions
@@ -119,6 +127,14 @@ typedef uint64_t UI_CLOCK_T;
     (void)0 : _UIAssertFail(#condition, __FILE__, __LINE__, __func__))
 #else
 #define UI_ASSERT(condition) ((void)0)
+/* NOTE: This definition makes asserts zero-cost in release (ignore, no crash).
+   Optionally, for _assert logging_ with no crash, enable UI_LOGGING and use:
+#define UI_ASSERT(condition) do { \
+	if (!(condition)) { \
+		UI_LOG(UI_LOG_WARNING, "Assertion failed: %s ", #condition); \
+	}
+} while (0)
+*/
 #endif // UI_DEBUG
 #endif // UI_ASSERT_CUSTOM
 
@@ -327,6 +343,14 @@ typedef uint64_t UI_CLOCK_T;
 
 #define UI_SWAP(s, a, b) do { s t = (a); (a) = (b); (b) = t; } while (0)
 
+// -- Debug/Logging
+
+#ifdef UI_LOGGING
+#define UI_LOG(level, format, ...) _UILog(level, __FILE__, __LINE__, format, ##__VA_ARGS__)
+#else
+#define UI_LOG(level, format, ...) ((void)0)
+#endif
+
 // -----------------------------------------------------------------------------
 // -- Input / Keycodes
 // -----------------------------------------------------------------------------
@@ -354,6 +378,17 @@ extern const int UI_KEYCODE_PAGE_DOWN;
 #define UI_KEYCODE_LETTER(x) (UI_KEYCODE_A  + (x) - 'A')
 #define UI_KEYCODE_DIGIT(x)  (UI_KEYCODE_0  + (x) - '0')
 #define UI_KEYCODE_FKEY(x)   (UI_KEYCODE_F1 + (x) -  1 )
+
+// -----------------------------------------------------------------------------
+// -- Debug/Logging Enumeration
+// -----------------------------------------------------------------------------
+
+typedef enum UILogLevel {
+    UI_LOG_DEBUG,
+    UI_LOG_INFO,
+    UI_LOG_WARNING,
+    UI_LOG_ERROR,
+} UILogLevel;
 
 // -----------------------------------------------------------------------------
 // -- UI Message Enumeration
@@ -839,8 +874,16 @@ int  UIMessageLoop();
 
 UI_CLOCK_T UIAnimateClock(); // In ms.
 
+// -- Debug/Logging
+
+typedef void (*UILogCallback)(UILogLevel level, const char *cMessage, void *userData);
+void           UILogSetCallback(UILogCallback callback, void *userData);
+
 #ifdef UI_DEBUG
-void UIInspectorLog(const char *cFormat, ...);
+// Note: Never call `_UILog` directly, as the definition is liable to chage.
+// Use the UI_LOG() macro for logging.
+void          _UILog(UILogLevel level, const char *file, int line, const char *cFormat, ...);
+void           UIInspectorLog(const char *cFormat, ...);
 #endif
 
 // -- Platform Defined Functions
@@ -1100,8 +1143,8 @@ UITheme uiThemeDark = {
 // == Internal/Private Header Includes and Definitions
 // =============================================================================
 
-#if defined(UI_DEBUG)
-#include <stdio.h> // fprintf, snprintf, vsnprintf (used in debug)
+#if defined(UI_DEBUG) || defined(UI_LOGGING)
+#include <stdio.h> // fprintf, snprintf, vsnprintf (used in debug/logging)
 #endif
 
 #ifdef UI_SSE2
@@ -1158,6 +1201,11 @@ struct {
 	UITable *inspectorTable;
 	UIWindow *inspectorTarget;
 	UICode *inspectorLog;
+#endif
+
+#ifdef UI_LOGGING
+	UILogCallback logCallback;
+	void *logUserData;
 #endif
 
 #ifdef UI_LINUX
@@ -5637,6 +5685,41 @@ void _UIInspectorSetFocusedWindow(UIWindow *window) {}
 void _UIInspectorRefresh() {}
 
 #endif // UI_DEBUG
+
+// =============================================================================
+// == Logging
+// =============================================================================
+
+#ifdef UI_LOGGING
+void _UILog(UILogLevel level, const char *file, int line, const char *cFormat, ...) {
+	char buffer[4096];
+	va_list arguments;
+	va_start(arguments, cFormat);
+	vsnprintf(buffer, sizeof(buffer), cFormat, arguments);
+	va_end(arguments);
+
+	if (ui.logCallback) {
+		ui.logCallback(level, buffer, ui.logUserData);
+    } else {
+		FILE *out = stdout;
+		// Optionally, use something like:
+		//FILE *out = level >= UI_LOG_ERROR ? stderr : stdout;
+#ifdef UI_DEBUG
+		fprintf(out, "[%s:%d] %s\n", file, line, buffer);
+		UIInspectorLog("[%s:%d] %s\n", file, line, buffer);
+#else
+		if (level >= UI_LOG_WARNING) { fprintf(out, "%s\n", buffer); }
+#endif
+	}
+}
+
+void UILogSetCallback(UILogCallback callback, void *userData) {
+	ui.logCallback = callback;
+	ui.logUserData = userData;
+}
+#else /* not UI_LOGGING */
+void UILogSetCallback(UILogCallback callback, void *userData) {}
+#endif
 
 // =============================================================================
 // == Automation for tests
