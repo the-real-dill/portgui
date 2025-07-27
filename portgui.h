@@ -21,6 +21,13 @@
  * See the README file, or read this source code, for more information.
  */
 
+// For now, enable luigi compatibility by default unless disabled (opt-out).
+// In the future the below lines may be removed, changing this to opt-in by
+// having the user explicity define `UI_LUIGI_COMPATIBLE` to enable.
+#ifndef UI_NO_LUIGI_COMPATIBILITY
+#define UI_LUIGI_COMPATIBLE
+#endif
+
 // =============================================================================
 // == Header Includes
 // =============================================================================
@@ -38,14 +45,15 @@
 #include <freetype/ftbitmap.h>
 #endif
 
+#ifdef UI_LUIGI_COMPATIBLE
 // NOTE: There is no need for these headers to be included, and in fact they
 // shouldn't be. They were included in the luigi library, and `nakst/gf` relies
 // on them being included, as that application doesn't include the headers.
-// They are left here for compatability. If you aren't building `nakst/gf`, you
-// can delete these. They may be removed in a future version.
-// -- DO NOT RELY ON THIS BEING INCLUDED FOR YOUR USE
+// They are left here for when luigi compatability is desired.
+// -- DO NOT RELY ON THESE BEING INCLUDED FOR YOUR USE
 #include <assert.h> // Used by `nakst/gf`
 #include <math.h>   // Used by `nakst/gf` (extension_v5)
+#endif
 
 // NOTE & TODO: These platform specific headers are defined here because the
 // current `UIMenu` structs utilizes "native" menus on the MacOS/Cocoa and
@@ -333,11 +341,14 @@ typedef uint64_t UI_CLOCK_T;
 
 // -- String
 
+#ifdef UI_LUIGI_COMPATIBLE
 // NOTE: These were exposed in luigi, and are used by `nakst/gf`, so they are
-// left here only for compatibility. They may be removed in a future version.
-// -- DO NOT USE.
+// left here only for compatibility. When not in `UI_LUIGI_COMPATIBLE` mode
+// These are defined in the internal/implementation section.
+// -- DO NOT USE IN YOUR APPLICATION.
 #define _UI_TO_STRING_1(x) #x
 #define _UI_TO_STRING_2(x) _UI_TO_STRING_1(x)
+#endif
 
 // -- General
 
@@ -1173,6 +1184,15 @@ UITheme uiThemeDark = {
 #undef _UNICODE
 #undef UNICODE
 #include <windows.h>
+#endif
+
+// -- Helpers ------------------------------------------------------------------
+
+#if !defined(UI_LUIGI_COMPATIBLE)
+// NOTE: In luigi compatible mode these are defined/exposed in the header-only
+// section, otherwise they are defined here for internal use and not exposed.
+#define _UI_TO_STRING_1(x) #x
+#define _UI_TO_STRING_2(x) _UI_TO_STRING_1(x)
 #endif
 
 // =============================================================================
