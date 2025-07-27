@@ -1022,154 +1022,6 @@ int   UIMeasureStringHeight();
 
 char *UIStringCopy(const char *in, ptrdiff_t inBytes);
 
-ptrdiff_t _UIStringLength(const char *cString) {
-	if (!cString) return 0;
-	ptrdiff_t length;
-	for (length = 0; cString[length]; length++);
-	return length;
-}
-
-#ifdef UI_UNICODE
-
-#ifndef UI_FREETYPE
-#error "Unicode support requires Freetype"
-#endif
-
-#define _UNICODE_MAX_CODEPOINT 0x10FFFF
-
-int Utf8GetCodePoint(const char *cString, ptrdiff_t bytesLength, ptrdiff_t *bytesConsumed) {
-	UI_ASSERT(bytesLength > 0 && "Attempted to get UTF-8 code point from an empty string");
-
-	if (bytesConsumed == NULL) {
-		ptrdiff_t bytesConsumed;
-		return Utf8GetCodePoint(cString, bytesLength, &bytesConsumed);
-	}
-
-	ptrdiff_t numExtraBytes;
-	uint8_t first = cString[0];
-
-	*bytesConsumed = 1;
-	if ((first & 0xF0) == 0xF0) {
-		numExtraBytes = 3;
-	} else if ((first & 0xE0) == 0xE0) {
-		numExtraBytes = 2;
-	} else if ((first & 0xC0) == 0xC0) {
-		numExtraBytes = 1;
-	} else if (first & 0x7F) {
-		return first & 0x80 ? -1 : first;
-	} else {
-		return -1;
-	}
-
-	if (bytesLength < numExtraBytes + 1) {
-		return -1;
-	}
-
-	int codePoint = ((int)first & (0x3F >> numExtraBytes)) << (6 * numExtraBytes);
-	for (ptrdiff_t idx = 1; idx < numExtraBytes + 1; idx++) {
-		char byte = cString[idx];
-		if ((byte & 0xC0) != 0x80) {
-			return -1;
-		}
-
-		codePoint |= (byte & 0x3F) << (6 * (numExtraBytes - idx));
-		(*bytesConsumed)++;
-	}
-
-	return codePoint > _UNICODE_MAX_CODEPOINT ? -1 : codePoint;
-}
-
-char * Utf8GetPreviousChar(char *string, char *offset) {
-	if (string == offset) {
-		return string;
-	}
-
-	char *prev = offset - 1;
-	while (prev > string) {
-		if ((*prev & 0xC0) == 0x80) prev--;
-		else break;
-	}
-
-	return prev;
-}
-
-ptrdiff_t Utf8GetCharBytes(const char *cString, ptrdiff_t bytes) {
-	if (!cString) {
-		return 0;
-	}
-	if (bytes == -1) {
-		bytes = _UIStringLength(cString);
-	}
-
-	ptrdiff_t bytesConsumed;
-	Utf8GetCodePoint(cString, bytes, &bytesConsumed);
-	return bytesConsumed;
-}
-
-ptrdiff_t Utf8StringLength(const char *cString, ptrdiff_t bytes) {
-	if (!cString) {
-		return 0;
-	}
-	if (bytes == -1) {
-		bytes = _UIStringLength(cString);
-	}
-
-	ptrdiff_t length = 0;
-	ptrdiff_t byteIndex = 0;
-	while (byteIndex < bytes) {
-		ptrdiff_t bytesConsumed;
-		Utf8GetCodePoint(cString+ byteIndex, bytes - byteIndex, &bytesConsumed);
-		byteIndex += bytesConsumed;
-		length++;
-
-		UI_ASSERT(byteIndex <= bytes && "Overran the end of the string while counting the number of UTF-8 code points");
-	}
-
-	return length;
-}
-
-#define _UI_ADVANCE_CHAR(index, text, count) \
-    index += Utf8GetCharBytes(text, count - index)
-
-#define _UI_SKIP_TAB(ti, text, bytesLeft, tabSize) do { \
-    int c = Utf8GetCodePoint(text, bytesLeft, NULL);    \
-    if (c == '\t') while (ti % tabSize) ti++;           \
-} while (0)
-
-#define _UI_MOVE_CARET_BACKWARD(caret, text, offset, offset2) do { \
-    char *prev = Utf8GetPreviousChar(text, text + offset);         \
-    caret = prev - text - offset2;                                 \
-} while (0)
-
-#define _UI_MOVE_CARET_FORWARD(caret, text, bytes, offset) do { \
-    caret += Utf8GetCharBytes(text + caret, bytes - offset);    \
-} while (0)
-
-#define _UI_MOVE_CARET_BY_WORD(text, bytes, offset) {               \
-    char *prev = Utf8GetPreviousChar(text, text + offset);          \
-    int c1 = Utf8GetCodePoint(prev, bytes - (prev - text), NULL);   \
-    int c2 = Utf8GetCodePoint(text + offset, bytes - offset, NULL); \
-    if (_UICharIsAlphaOrDigitOrUnderscore(c1) != _UICharIsAlphaOrDigitOrUnderscore(c2)) break; \
-}
-
-#else // not UI_UNICODE
-
-#define _UI_ADVANCE_CHAR(index, code, count) index++
-
-#define _UI_SKIP_TAB(ti, text, bytesLeft, tabSize) \
-    if (*(text) == '\t') while (ti % tabSize) ti++
-
-#define _UI_MOVE_CARET_BACKWARD(caret, text, offset, offset2) caret--
-#define _UI_MOVE_CARET_FORWARD(caret, text, bytes, offset) caret++
-
-#define _UI_MOVE_CARET_BY_WORD(text, bytes, offset) { \
-    char c1 = (text)[offset - 1];                     \
-    char c2 = (text)[offset];                         \
-    if (_UICharIsAlphaOrDigitOrUnderscore(c1) != _UICharIsAlphaOrDigitOrUnderscore(c2)) break; \
-}
-
-#endif // UI_UNICODE
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // =============================================================================
 // == IMPLEMENTATION ===========================================================
@@ -1376,6 +1228,154 @@ void  _UIUpdate();
 // =============================================================================
 // == String/UTF8 Handling
 // =============================================================================
+
+ptrdiff_t _UIStringLength(const char *cString) {
+	if (!cString) return 0;
+	ptrdiff_t length;
+	for (length = 0; cString[length]; length++);
+	return length;
+}
+
+#ifdef UI_UNICODE
+
+#ifndef UI_FREETYPE
+#error "Unicode support requires Freetype"
+#endif
+
+#define _UNICODE_MAX_CODEPOINT 0x10FFFF
+
+int _Utf8GetCodePoint(const char *cString, ptrdiff_t bytesLength, ptrdiff_t *bytesConsumed) {
+	UI_ASSERT(bytesLength > 0 && "Attempted to get UTF-8 code point from an empty string");
+
+	if (bytesConsumed == NULL) {
+		ptrdiff_t bytesConsumed;
+		return _Utf8GetCodePoint(cString, bytesLength, &bytesConsumed);
+	}
+
+	ptrdiff_t numExtraBytes;
+	uint8_t first = cString[0];
+
+	*bytesConsumed = 1;
+	if ((first & 0xF0) == 0xF0) {
+		numExtraBytes = 3;
+	} else if ((first & 0xE0) == 0xE0) {
+		numExtraBytes = 2;
+	} else if ((first & 0xC0) == 0xC0) {
+		numExtraBytes = 1;
+	} else if (first & 0x7F) {
+		return first & 0x80 ? -1 : first;
+	} else {
+		return -1;
+	}
+
+	if (bytesLength < numExtraBytes + 1) {
+		return -1;
+	}
+
+	int codePoint = ((int)first & (0x3F >> numExtraBytes)) << (6 * numExtraBytes);
+	for (ptrdiff_t idx = 1; idx < numExtraBytes + 1; idx++) {
+		char byte = cString[idx];
+		if ((byte & 0xC0) != 0x80) {
+			return -1;
+		}
+
+		codePoint |= (byte & 0x3F) << (6 * (numExtraBytes - idx));
+		(*bytesConsumed)++;
+	}
+
+	return codePoint > _UNICODE_MAX_CODEPOINT ? -1 : codePoint;
+}
+
+char *_Utf8GetPreviousChar(char *string, char *offset) {
+	if (string == offset) {
+		return string;
+	}
+
+	char *prev = offset - 1;
+	while (prev > string) {
+		if ((*prev & 0xC0) == 0x80) prev--;
+		else break;
+	}
+
+	return prev;
+}
+
+ptrdiff_t _Utf8GetCharBytes(const char *cString, ptrdiff_t bytes) {
+	if (!cString) {
+		return 0;
+	}
+	if (bytes == -1) {
+		bytes = _UIStringLength(cString);
+	}
+
+	ptrdiff_t bytesConsumed;
+	_Utf8GetCodePoint(cString, bytes, &bytesConsumed);
+	return bytesConsumed;
+}
+
+ptrdiff_t _Utf8StringLength(const char *cString, ptrdiff_t bytes) {
+	if (!cString) {
+		return 0;
+	}
+	if (bytes == -1) {
+		bytes = _UIStringLength(cString);
+	}
+
+	ptrdiff_t length = 0;
+	ptrdiff_t byteIndex = 0;
+	while (byteIndex < bytes) {
+		ptrdiff_t bytesConsumed;
+		_Utf8GetCodePoint(cString+ byteIndex, bytes - byteIndex, &bytesConsumed);
+		byteIndex += bytesConsumed;
+		length++;
+
+		UI_ASSERT(byteIndex <= bytes && "Overran the end of the string while counting the number of UTF-8 code points");
+	}
+
+	return length;
+}
+
+#define _UI_ADVANCE_CHAR(index, text, count) \
+    index += _Utf8GetCharBytes(text, count - index)
+
+#define _UI_SKIP_TAB(ti, text, bytesLeft, tabSize) do { \
+    int c = _Utf8GetCodePoint(text, bytesLeft, NULL);   \
+    if (c == '\t') while (ti % tabSize) ti++;           \
+} while (0)
+
+#define _UI_MOVE_CARET_BACKWARD(caret, text, offset, offset2) do { \
+    char *prev = _Utf8GetPreviousChar(text, text + offset);        \
+    caret = prev - text - offset2;                                 \
+} while (0)
+
+#define _UI_MOVE_CARET_FORWARD(caret, text, bytes, offset) do { \
+    caret += _Utf8GetCharBytes(text + caret, bytes - offset);   \
+} while (0)
+
+#define _UI_MOVE_CARET_BY_WORD(text, bytes, offset) {                \
+    char *prev = _Utf8GetPreviousChar(text, text + offset);          \
+    int c1 = _Utf8GetCodePoint(prev, bytes - (prev - text), NULL);   \
+    int c2 = _Utf8GetCodePoint(text + offset, bytes - offset, NULL); \
+    if (_UICharIsAlphaOrDigitOrUnderscore(c1) != _UICharIsAlphaOrDigitOrUnderscore(c2)) break; \
+}
+
+#else // not UI_UNICODE
+
+#define _UI_ADVANCE_CHAR(index, code, count) index++
+
+#define _UI_SKIP_TAB(ti, text, bytesLeft, tabSize) \
+    if (*(text) == '\t') while (ti % tabSize) ti++
+
+#define _UI_MOVE_CARET_BACKWARD(caret, text, offset, offset2) caret--
+#define _UI_MOVE_CARET_FORWARD(caret, text, bytes, offset) caret++
+
+#define _UI_MOVE_CARET_BY_WORD(text, bytes, offset) { \
+    char c1 = (text)[offset - 1];                     \
+    char c2 = (text)[offset];                         \
+    if (_UICharIsAlphaOrDigitOrUnderscore(c1) != _UICharIsAlphaOrDigitOrUnderscore(c2)) break; \
+}
+
+#endif // UI_UNICODE
 
 int _UIByteToColumn(const char *string, int byte, int bytes, int tabSize) {
 	int ti = 0, i = 0;
@@ -4365,7 +4365,7 @@ int UIDrawStringHighlighted(UIPainter *painter, UIRectangle lineBounds, const ch
 	while (bytes) {
 #ifdef UI_UNICODE
 		ptrdiff_t bytesConsumed;
-		int c = Utf8GetCodePoint(string, bytes, &bytesConsumed);
+		int c = _Utf8GetCodePoint(string, bytes, &bytesConsumed);
 		UI_ASSERT(bytesConsumed > 0);
 		string += bytesConsumed;
 		bytes -= bytesConsumed;
@@ -4947,7 +4947,7 @@ int UIMeasureStringHeight() {
 
 int UIMeasureStringWidth(const char *string, ptrdiff_t bytes) {
 #ifdef UI_UNICODE
-	return Utf8StringLength(string, bytes) * ui.activeFont->glyphWidth;
+	return _Utf8StringLength(string, bytes) * ui.activeFont->glyphWidth;
 #else
 	if (bytes == -1) {
 		bytes = _UIStringLength(string);
@@ -5455,7 +5455,7 @@ void UIDrawString(UIPainter *painter, UIRectangle r, const char *string, ptrdiff
 	while (j < bytes) {
 		ptrdiff_t bytesConsumed = 1;
 #ifdef UI_UNICODE
-		int c = Utf8GetCodePoint(string, bytes - j, &bytesConsumed);
+		int c = _Utf8GetCodePoint(string, bytes - j, &bytesConsumed);
 		UI_ASSERT(bytesConsumed > 0);
 		string += bytesConsumed;
 #else
