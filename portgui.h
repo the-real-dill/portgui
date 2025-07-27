@@ -4973,8 +4973,9 @@ UIFont *UIFontCreate(const char *cPath, uint32_t size) {
 			font->glyphHeight = (font->font->size->metrics.ascender - font->font->size->metrics.descender) / 64;
 			font->isFreeType = true;
 			return font;
-		} else
-			printf("Cannot load font %s : %d\n", cPath, ret);
+		} else {
+			UI_LOG(UI_LOG_WARNING, "Failed to load font %s : %d", cPath, ret);
+		}
 	}
 #endif
 
