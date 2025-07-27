@@ -54,17 +54,10 @@
 #endif
 
 #if defined(UI_LINUX) || defined(UI_COCOA)
-#include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 #include <math.h>
 
 #define UI_ASSERT assert
-#define UI_CALLOC(x) calloc(1, (x))
-#define UI_FREE free
-#define UI_MALLOC malloc
-#define UI_REALLOC realloc
-#define UI_MEMMOVE(d, s, n) do { size_t _n = n; if (_n) { memmove(d, s, _n); } } while (0)
 #endif
 
 #ifdef UI_LINUX
@@ -88,22 +81,12 @@
 #define UI_ASSERT(x) do { if (!(x)) { \
     MessageBox(0, "Assertion failure on line " _UI_TO_STRING_2(__LINE__), 0, 0); \
     ExitProcess(1); } } while (0)
-#define UI_CALLOC(x) HeapAlloc(ui.heap, HEAP_ZERO_MEMORY, (x))
-#define UI_FREE(x) HeapFree(ui.heap, 0, (x))
-#define UI_MALLOC(x) HeapAlloc(ui.heap, 0, (x))
-#define UI_REALLOC _UIHeapReAlloc
-#define UI_MEMMOVE _UIMemmove
 #endif
 
 #if defined(UI_ESSENCE)
 #include <essence.h>
 
 #define UI_ASSERT EsAssert
-#define UI_CALLOC(x) EsHeapAllocate((x), true)
-#define UI_FREE EsHeapFree
-#define UI_MALLOC(x) EsHeapAllocate((x), false)
-#define UI_REALLOC(x, y) EsHeapReallocate((x), (y), false)
-#define UI_MEMMOVE EsCRTmemmove
 
 // Callback to allow the application to process messages.
 void _UIMessageProcess(EsMessage *message);
@@ -143,6 +126,20 @@ typedef uint64_t UI_CLOCK_T;
 
 #if !defined(UI_CLOCK_CUSTOM)
 #define UI_CLOCK _UIClock
+#endif
+
+// -- Memory Management
+
+// NOTE: UI_CALLOC was defined this way in luigi, so it is kept for
+// compatability, and UI_CALLOC_A has been defined for the 'array' version.
+
+#if !defined(UI_MEMORY_CUSTOM)
+#define UI_CALLOC(size)              _UICalloc(1, (size))
+#define UI_CALLOC_A(num, size)       _UICalloc((num), (size))
+#define UI_MALLOC(size)              _UIMalloc((size))
+#define UI_REALLOC(pointer, newSize) _UIRealloc((pointer), (newSize))
+#define UI_MEMMOVE(dest, src, bytes) _UIMemmove((dest), (src), (bytes))
+#define UI_FREE(pointer)             _UIFree((pointer))
 #endif
 
 // -----------------------------------------------------------------------------
@@ -872,6 +869,14 @@ void UIInspectorLog(const char *cFormat, ...);
 
 #if !defined(UI_CLOCK_CUSTOM)
 UI_CLOCK_T _UIClock();
+#endif
+
+#if !defined(UI_MEMORY_CUSTOM)
+void *_UICalloc(size_t num, size_t size);
+void *_UIMalloc(size_t size);
+void *_UIRealloc(void *pointer, size_t new_size);
+void *_UIMemmove(void *dest, const void *src, size_t numBytes);
+void  _UIFree(void *ptr);
 #endif
 
 // -----------------------------------------------------------------------------
@@ -5784,6 +5789,8 @@ struct _UIOSWindowStruct {
 
 // -- Headers ------------------------------------------------------------------
 
+#include <stdlib.h> // alloc, free, etc., abort
+#include <string.h> // memmove
 #include <time.h>   // timespec, clock_gettime
 
 // -- Functions ----------------------------------------------------------------
@@ -5794,6 +5801,17 @@ UI_CLOCK_T _UIClock() {
 	struct timespec spec;
 	clock_gettime(CLOCK_REALTIME, &spec);
 	return (UI_CLOCK_T) (spec.tv_sec * 1000 + spec.tv_nsec / 1000000);
+}
+
+// -- Memory Management
+
+void *_UICalloc(size_t num, size_t size)        { return calloc(num, size); }
+void *_UIMalloc(size_t size)                    { return malloc(size); }
+void *_UIRealloc(void *pointer, size_t newSize) { return realloc(pointer, newSize); }
+void  _UIFree(void *pointer)                    { free(pointer); }
+
+void *_UIMemmove(void *dest, const void *src, size_t numBytes) {
+	return memmove(dest, src, numBytes);
 }
 
 #endif // defined(UI_LINUX) || defined(UI_COCOA)
@@ -6583,35 +6601,47 @@ UI_CLOCK_T _UIClock() { return (UI_CLOCK_T) GetTickCount(); }
 
 // -- Memory Management
 
-void *_UIHeapReAlloc(void *pointer, size_t size) {
+void *_UICalloc(size_t num, size_t size) {
+	size_t totalSize = num * size;
+	// Check for overflow (optional but recommended)
+	if (size != 0 && totalSize / size != num) { return NULL; }
+	return HeapAlloc(ui.heap, HEAP_ZERO_MEMORY, totalSize);
+}
+
+void *_UIMalloc(size_t size) {
+	return HeapAlloc(ui.heap, 0, size);
+}
+
+void *_UIRealloc(void *pointer, size_t newSize) {
 	if (pointer) {
-		if (size) {
-			return HeapReAlloc(ui.heap, 0, pointer, size);
+		if (newSize) {
+			return HeapReAlloc(ui.heap, 0, pointer, newSize);
 		} else {
 			UI_FREE(pointer);
 			return NULL;
 		}
 	} else {
-		if (size) {
-			return UI_MALLOC(size);
-		} else {
-			return NULL;
-		}
+		if (newSize) { return UI_MALLOC(newSize); }
+		else         { return NULL; }
 	}
 }
 
-void *_UIMemmove(void *dest, const void *src, size_t n) {
+void  _UIFree(void *ptr) {
+	HeapFree(ui.heap, 0, ptr);
+}
+
+void *_UIMemmove(void *dest, const void *src, size_t numBytes) {
 	if ((uintptr_t) dest < (uintptr_t) src) {
 		uint8_t *dest8 = (uint8_t *) dest;
 		const uint8_t *src8 = (const uint8_t *) src;
-		for (uintptr_t i = 0; i < n; i++) {
+		for (uintptr_t i = 0; i < numBytes; i++) {
 			dest8[i] = src8[i];
 		}
 		return dest;
 	} else {
 		uint8_t *dest8 = (uint8_t *) dest;
 		const uint8_t *src8 = (const uint8_t *) src;
-		for (uintptr_t i = n; i; i--) {
+		for (uintptr_t i = numBytes; i; i--) {
 			dest8[i - 1] = src8[i - 1];
 		}
 		return dest;
@@ -7000,6 +7030,31 @@ const int UI_KEYCODE_PAGE_DOWN = ES_SCANCODE_PAGE_DOWN;
 // -- Clock/Timing
 
 UI_CLOCK_T _UIClock() { return (UI_CLOCK_T) EsTimeStampMs(); }
+
+// -- Memory Management
+
+void *_UICalloc(size_t num, size_t size) {
+	size_t totalSize = num * size;
+	// Check for overflow (optional but recommended)
+	if (size != 0 && totalSize / size != num) { return NULL; }
+	return EsHeapAllocate(totalSize, true);
+}
+
+void *_UIMalloc(size_t size) {
+	return EsHeapAllocate(size, false);
+}
+
+void *_UIRealloc(void *pointer, size_t newSize) {
+	return EsHeapReallocate(pointer, newSize, false);
+}
+
+void  _UIFree(void *pointer) {
+	EsHeapFree(pointer);
+}
+
+void *_UIMemmove(void *dest, const void *src, size_t numBytes) {
+	EsCRTmemmove(dest, src, numBytes);
+}
 
 // -- Helpers ------------------------------------------------------------------
 
