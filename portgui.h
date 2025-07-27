@@ -38,6 +38,14 @@
 #include <freetype/ftbitmap.h>
 #endif
 
+// NOTE: There is no need for this header to be included, and in fact it
+// shouldn't be. It was included in the luigi library, and `nakst/gf` relies
+// on it being included, as that application doesn't include the header.
+// It is left here for compatability. If you aren't building `nakst/gf`, you
+// can delete this. It may be removed in a future version.
+// -- DO NOT RELY ON THIS BEING INCLUDED FOR YOUR USE
+#include <assert.h> // Used by `nakst/gf`
+
 #ifdef UI_DEBUG
 #include <stdio.h>
 #endif
@@ -54,10 +62,7 @@
 #endif
 
 #if defined(UI_LINUX) || defined(UI_COCOA)
-#include <assert.h>
 #include <math.h>
-
-#define UI_ASSERT assert
 #endif
 
 #ifdef UI_LINUX
@@ -77,16 +82,10 @@
 #undef _UNICODE
 #undef UNICODE
 #include <windows.h>
-
-#define UI_ASSERT(x) do { if (!(x)) { \
-    MessageBox(0, "Assertion failure on line " _UI_TO_STRING_2(__LINE__), 0, 0); \
-    ExitProcess(1); } } while (0)
 #endif
 
 #if defined(UI_ESSENCE)
 #include <essence.h>
-
-#define UI_ASSERT EsAssert
 
 // Callback to allow the application to process messages.
 void _UIMessageProcess(EsMessage *message);
@@ -141,6 +140,17 @@ typedef uint64_t UI_CLOCK_T;
 #define UI_MEMMOVE(dest, src, bytes) _UIMemmove((dest), (src), (bytes))
 #define UI_FREE(pointer)             _UIFree((pointer))
 #endif
+
+// -- Debug
+
+#if !defined(UI_ASSERT_CUSTOM)
+#ifdef UI_DEBUG
+#define UI_ASSERT(condition) ((condition) ? \
+    (void)0 : _UIAssertFail(#condition, __FILE__, __LINE__, __func__))
+#else
+#define UI_ASSERT(condition) ((void)0)
+#endif // UI_DEBUG
+#endif // UI_ASSERT_CUSTOM
 
 // -----------------------------------------------------------------------------
 // -- Element Size
@@ -877,6 +887,12 @@ void *_UIMalloc(size_t size);
 void *_UIRealloc(void *pointer, size_t new_size);
 void *_UIMemmove(void *dest, const void *src, size_t numBytes);
 void  _UIFree(void *ptr);
+#endif
+
+#ifdef UI_DEBUG
+#if !defined(UI_ASSERT_CUSTOM)
+void _UIAssertFail(const char *condition, const char *file, unsigned int line, const char *function);
+#endif
 #endif
 
 // -----------------------------------------------------------------------------
@@ -5814,6 +5830,11 @@ void *_UIMemmove(void *dest, const void *src, size_t numBytes) {
 	return memmove(dest, src, numBytes);
 }
 
+// -- Debug
+
+// NOTE: `_UIAssertFail()` is defined per platform, as each provides a
+// different implementation.
+
 #endif // defined(UI_LINUX) || defined(UI_COCOA)
 
 #ifdef UI_LINUX
@@ -5843,7 +5864,15 @@ const int UI_KEYCODE_PAGE_UP = XK_Page_Up;
 
 // -- UI/Platform Required Infrastructure --------------------------------------
 
-// None so far on this platform...
+// -- Debug
+
+#if defined(UI_DEBUG) && !defined(UI_ASSERT_CUSTOM)
+void _UIAssertFail(const char *condition, const char *file, unsigned int line, const char *function)
+{
+	fprintf(stderr, "Assertion failed: %s in %s (%s:%u)\n", condition, function ? function : "unknown", file, line);
+	abort();
+}
+#endif
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -6648,6 +6677,18 @@ void *_UIMemmove(void *dest, const void *src, size_t numBytes) {
 	}
 }
 
+// -- Debug
+
+#if defined(UI_DEBUG) && !defined(UI_ASSERT_CUSTOM)
+void _UIAssertFail(const char *condition, const char *file, unsigned int line, const char *function)
+{
+	char buffer[256];
+	snprintf(buffer, sizeof(buffer), "Assertion failed: %s in %s (%s:%d)", condition, function ? function : "unknown", file, line);
+	MessageBox(0, buffer, "Assertion Failure", MB_OK | MB_ICONERROR);
+	ExitProcess(1);
+}
+#endif
+
 // -- Forward Declarations
 
 LRESULT CALLBACK _UIWindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -7056,6 +7097,15 @@ void *_UIMemmove(void *dest, const void *src, size_t numBytes) {
 	EsCRTmemmove(dest, src, numBytes);
 }
 
+// -- Debug
+
+#if defined(UI_DEBUG) && !defined(UI_ASSERT_CUSTOM)
+void _UIAssertFail(const char *condition, const char *file, unsigned int line, const char *function)
+{
+	EsPanic("Assertion failed: %s in %s (%s:%d)", condition, function ? function : "unknown", file, line);
+}
+#endif
+
 // -- Helpers ------------------------------------------------------------------
 
 void _UIWindowGetScreenPosition(UIWindow *window, int *_x, int *_y) {
@@ -7287,6 +7337,22 @@ const int UI_KEYCODE_PAGE_UP = kVK_PageUp;
 const int UI_KEYCODE_PAGE_DOWN = kVK_PageDown;
 
 // -- UI/Platform Required Infrastructure --------------------------------------
+
+// -- Debug
+
+#if defined(UI_DEBUG) && !defined(UI_ASSERT_CUSTOM)
+void _UIAssertFail(const char *condition, const char *file, unsigned int line, const char *function)
+{
+	NSAlert *alert = [[NSAlert alloc] init];
+	[alert setMessageText:@"Assertion Failure"];
+	[alert setInformativeText:[NSString stringWithFormat:@"Assertion failed: %s in %s (%s:%u)", condition, function ? function : "unknown", file, line]];
+	[alert addButtonWithTitle:@"OK"];
+	[alert runModal];
+	abort();
+}
+#endif
+
+// -- Platform Supporting Functions
 
 int (*_cocoaAppMain)(int, char **);
 int _cocoaArgc;
