@@ -110,11 +110,7 @@ int InputMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	return 0;
 }
 
-#ifdef UI_WINDOWS
-int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
-#else
-int main(int argc, char **argv) {
-#endif
+int AppMain(int argc, char **argv) {
 	UIInitialise();
 	UIWindowCreate(0, UI_ELEMENT_PARENT_PUSH, "Converter", 500, 300);
 	UIPanelCreate(0, UI_ELEMENT_PARENT_PUSH | UI_PANEL_COLOR_1 | UI_PANEL_EXPAND | UI_PANEL_MEDIUM_SPACING);
@@ -137,4 +133,25 @@ int main(int argc, char **argv) {
 	output = UILabelCreate(0, UI_ELEMENT_H_FILL, 0, -1);
 	UIElementFocus(&input->e);
 	return UIMessageLoop();
+}
+
+// NOTE: This first `#ifdef` provides the right `main` entrypoint for each platform
+#ifdef UI_WINDOWS
+int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
+#else
+int main(int argc, char **argv) {
+#endif
+// NOTE: This second `#ifdef` calls the `UICocoaMain` 'hook' on macOS, to let Cocoa manage the
+// event loop. On Linux/Posix, we just call straight to our application function.
+// On windows, we don't have `argc, argv` values, so we pass "null" values.
+// -- DON'T WORRY. ALL OF THIS WILL BE REPLACED WITH A CLEAN AND STANDARDIZED APPROACH SOON.
+#ifdef UI_COCOA
+	int returnCode = UICocoaMain(argc, argv, AppMain);
+#elif defined(UI_WINDOWS)
+	int returnCode = AppMain(0, NULL);
+#else
+	int returnCode = AppMain(argc, argv);
+#endif
+	// Do any cleanup/etc. here
+	return returnCode;
 }

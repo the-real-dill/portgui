@@ -154,11 +154,7 @@ int InputTextboxMessage(UIElement *element, UIMessage message, int di, void *dp)
 	return 0;
 }
 
-#ifdef UI_WINDOWS
-int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
-#else
-int main(int argc, char **argv) {
-#endif
+int AppMain(int argc, char **argv) {
 	// Initialise PortGUI and create a window.
 	
 	UIInitialise();
@@ -197,4 +193,25 @@ int main(int argc, char **argv) {
 	// Process input messages until the window is closed.
 
 	return UIMessageLoop();
+}
+
+// NOTE: This first `#ifdef` provides the right `main` entrypoint for each platform
+#ifdef UI_WINDOWS
+int WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
+#else
+int main(int argc, char **argv) {
+#endif
+// NOTE: This second `#ifdef` calls the `UICocoaMain` 'hook' on macOS, to let Cocoa manage the
+// event loop. On Linux/Posix, we just call straight to our application function.
+// On windows, we don't have `argc, argv` values, so we pass "null" values.
+// -- DON'T WORRY. ALL OF THIS WILL BE REPLACED WITH A CLEAN AND STANDARDIZED APPROACH SOON.
+#ifdef UI_COCOA
+	int returnCode = UICocoaMain(argc, argv, AppMain);
+#elif defined(UI_WINDOWS)
+	int returnCode = AppMain(0, NULL);
+#else
+	int returnCode = AppMain(argc, argv);
+#endif
+	// Do any cleanup/etc. here
+	return returnCode;
 }
