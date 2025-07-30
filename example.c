@@ -23,30 +23,6 @@ UISlider *slider_vert;
 UIGauge *gauge_vert1;
 UIGauge *gauge_vert2;
 
-const char *themeItems[] = {
-	"panel1", 
-	"panel2",
-	"selected",
-	"border",
-	"text", 
-	"textDisabled", 
-	"textSelected", 
-	"buttonNormal", 
-	"buttonHovered", 
-	"buttonPressed", 
-	"buttonDisabled",
-	"textboxNormal", 
-	"textboxFocused", 
-	"codeFocused", 
-	"codeBackground", 
-	"codeDefault", 
-	"codeComment", 
-	"codeString", 
-	"codeNumber", 
-	"codeOperator", 
-	"codePreprocessor",
-};
-
 int MyButtonMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	if (message == UI_MSG_CLICKED) {
 		printf("clicked!\n");
@@ -132,7 +108,7 @@ int main(int argc, char **argv) {
 
 	window = UIWindowCreate(0, 0, "PortGUI - Example Application", 0, 0);
 
-    // Split window (vertically) into top/bottom panes.
+	// Split window (vertically) into top/bottom panes.
 	UISplitPane *uisplit_topbottom = UISplitPaneCreate(&window->e, UI_SPLIT_PANE_VERTICAL, 0.75f);
 
 	// Split top pane (horizontally) into left/right panes.
