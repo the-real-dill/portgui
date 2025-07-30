@@ -8,7 +8,7 @@
 // #define UI_WINDOWS
 // #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "portgui.h"
+#include "../portgui.h"
 
 #include <stdio.h>
 

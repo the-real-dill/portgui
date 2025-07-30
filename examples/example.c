@@ -10,7 +10,7 @@
 // #define UI_WINDOWS
 // #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "portgui.h"
+#include "../portgui.h"
 
 UIWindow *window;
 UILabel *label;
@@ -154,7 +154,7 @@ int AppMain(int argc, char **argv) {
 		char *buffer = NULL;
 		size_t fileSize = 0;
 		size_t bytesRead = 0;
-		FILE *file = fopen("portgui.h", "rb");
+		FILE *file = fopen("../portgui.h", "rb");
 		if (file) {
 			fseek(file, 0, SEEK_END);
 			fileSize = ftell(file);

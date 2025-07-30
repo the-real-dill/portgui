@@ -46,16 +46,22 @@ jobs:
 
     - name: Build with Makefile (Linux/Ubuntu)
       if: runner.os == 'Linux'
-      run: make all
+      run: |
+        cd examples
+        make all
 
     - name: Build with Makefile (macOS)
       if: runner.os == 'macOS'
-      run: make all
+      run: |
+        cd examples
+        make all
 
     - name: Build with Makefile (Windows)
       if: runner.os == 'Windows'
       shell: msys2 {0}
-      run: make all
+      run: |
+        cd examples
+        make all
 
     - name: Checkout `nakst/gf` repository
       if: runner.os == 'Linux' || runner.os == 'macOS'

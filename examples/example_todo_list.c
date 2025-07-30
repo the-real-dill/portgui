@@ -12,7 +12,7 @@
 // #define UI_WINDOWS
 // #define UI_DEBUG
 #define UI_IMPLEMENTATION
-#include "portgui.h"
+#include "../portgui.h"
 
 // Include standard headers.
 
