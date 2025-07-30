@@ -53,7 +53,7 @@ else
     ALL = $(foreach config,$(CONFIGS),$(addsuffix $(EXE_SUFFIX),$(addsuffix -$(config),$(PROGS))))
 endif
 
-# If 'pkg-config' not availabole, override with e.g.:
+# If 'pkg-config' not available, override with e.g.:
 #   make FREETYPE_CFLAGS_CFG="-I/path/to/freetype" FREETYPE_LDFLAGS="freetype2"
 FREETYPE_CFLAGS_CFG ?= $(shell pkg-config --cflags freetype2 2>/dev/null)
 FREETYPE_LDFLAGS ?= $(shell pkg-config --libs freetype2 2>/dev/null)
@@ -111,9 +111,13 @@ PROG_example_unit_converter_EXTRA_LDFLAGS =
 # Add includes if needed (usually standard), and platform-specific OpenGL libs
 #PROG_example_opengl_INCLUDES =  # e.g., -I/path/to/opengl/headers if non-standard
 #PROG_example_opengl_EXTRA_CFLAGS =  # e.g., any extra defines or flags
-#PROG_example_opengl_EXTRA_LDFLAGS = $(OPENGL_LDFLAGS)
+#PROG_example_opengl_EXTRA_LDFLAGS = $(PLATFORM_OPENGL_LDFLAGS)
+
+.PHONY: $(CONFIGS) all clean
 
 all: $(ALL)
+
+$(foreach config,$(CONFIGS),$(eval $(config): $(addsuffix $(APP_BUNDLE_SUFFIX)$(EXE_SUFFIX),$(addsuffix -$(config),$(PROGS)))))
 
 # Generate compilation rules for each program/config combo
 # NOTE: For the `makefile_macos_bundle.sh` bundling, remove "|| exit 1" to continue on bundle failure
@@ -134,4 +138,6 @@ $(foreach prog,$(PROGS), \
 )
 
 clean:
-	rm -f $(ALL)
+	@echo "🧹 Cleaning compiled application artifacts"
+	@rm -f $(foreach config,$(CONFIGS),$(addsuffix $(EXE_SUFFIX),$(addsuffix -$(config),$(PROGS))))
+	@rm -rf $(foreach config,$(CONFIGS),$(addsuffix $(APP_BUNDLE_SUFFIX),$(addsuffix -$(config),$(PROGS))))
