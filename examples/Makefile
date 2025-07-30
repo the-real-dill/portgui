@@ -2,7 +2,6 @@
 # application. This is to demonstrate how a new application/example could be
 # added that required custom flags on particular operating systems.
 
-
 CC = gcc
 
 # Platform detection (override with make PLATFORM=linux/win32/macos)
@@ -22,18 +21,21 @@ ifeq ($(PLATFORM),linux)
     PLATFORM_LDFLAGS = -lX11
     #PLATFORM_OPENGL_LDFLAGS = -lGL  # Example
     EXE_SUFFIX =
+    APP_BUNDLE_SUFFIX =
 else ifeq ($(PLATFORM),win32)
     UI_OS_DEFINE = -D UI_WINDOWS
     PLATFORM_CFLAGS =
     PLATFORM_LDFLAGS = -luser32 -lgdi32
     #PLATFORM_OPENGL_LDFLAGS = -lopengl32  # Example
     EXE_SUFFIX = .exe
+    APP_BUNDLE_SUFFIX =
 else ifeq ($(PLATFORM),macos)
     UI_OS_DEFINE = -D UI_COCOA
     PLATFORM_CFLAGS = -x objective-c
     PLATFORM_LDFLAGS = -framework Cocoa
     #PLATFORM_OPENGL_LDFLAGS = -framework OpenGL  # Example (NOTE: OpenGL is deprecated on macOS)
     EXE_SUFFIX =
+    APP_BUNDLE_SUFFIX = .app
 else
     $(error Unsupported platform: $(PLATFORM))
 endif
@@ -44,7 +46,12 @@ CONFIGS = base freetype freetype_unicode debug debug_freetype debug_freetype_uni
 
 PROGS = example example_todo_list example_unit_converter #example_opengl  # Example
 
-ALL = $(foreach config,$(CONFIGS),$(addsuffix $(EXE_SUFFIX),$(addsuffix -$(config),$(PROGS))))
+# Define output targets based on platform
+ifeq ($(PLATFORM),macos)
+    ALL = $(foreach config,$(CONFIGS),$(addsuffix $(APP_BUNDLE_SUFFIX),$(addsuffix -$(config),$(PROGS))))
+else
+    ALL = $(foreach config,$(CONFIGS),$(addsuffix $(EXE_SUFFIX),$(addsuffix -$(config),$(PROGS))))
+endif
 
 # If 'pkg-config' not availabole, override with e.g.:
 #   make FREETYPE_CFLAGS_CFG="-I/path/to/freetype" FREETYPE_LDFLAGS="freetype2"
@@ -109,10 +116,15 @@ PROG_example_unit_converter_EXTRA_LDFLAGS =
 all: $(ALL)
 
 # Generate compilation rules for each program/config combo
+# NOTE: For the `makefile_macos_bundle.sh` bundling, remove "|| exit 1" to continue on bundle failure
 define MAKE_RULES
-$(1)-$(2)$(EXE_SUFFIX): $(1).c
-	@echo "🔧 Building $(1)-$(2)$(EXE_SUFFIX) ..."
-	$(CC) $(CFLAGS_$(2)) $(PROG_$(1)_INCLUDES) $(PROG_$(1)_EXTRA_CFLAGS) $$< $(LDFLAGS) $(EXTRA_LDFLAGS_$(2)) $(PROG_$(1)_EXTRA_LDFLAGS) -o $$@
+$(1)-$(2)$(APP_BUNDLE_SUFFIX)$(EXE_SUFFIX): $(1).c
+	@echo "🔧 Building $(1)-$(2) ..."
+	$(CC) $(CFLAGS_$(2)) $(PROG_$(1)_INCLUDES) $(PROG_$(1)_EXTRA_CFLAGS) $$< $(LDFLAGS) $(EXTRA_LDFLAGS_$(2)) $(PROG_$(1)_EXTRA_LDFLAGS) -o $(1)-$(2)
+	@if [ "$(PLATFORM)" = "macos" ]; then \
+		chmod +x ./makefile_macos_bundle.sh; \
+		./makefile_macos_bundle.sh "$(1)-$(2)" "$(1)-$(2).app" "$(1)-$(2)" || exit 1; \
+	fi
 endef
 
 $(foreach prog,$(PROGS), \
