@@ -155,11 +155,33 @@ int main(int argc, char **argv) {
 	{
 		// Top-Right pane.
 		UICode *code = UICodeCreate(&uisplit_top_leftright->e, 0);
-		char *buffer = (char *) malloc(262144);
-		FILE *f = fopen("portgui.h", "rb");
-		size_t size = fread(buffer, 1, 262144, f);
-		fclose(f);
-		UICodeInsertContent(code, buffer, size, true);
+
+		char *buffer = NULL;
+		size_t fileSize = 0;
+		size_t bytesRead = 0;
+		FILE *file = fopen("portgui.h", "rb");
+		if (file) {
+			fseek(file, 0, SEEK_END);
+			fileSize = ftell(file);
+			fseek(file, 0, SEEK_SET);
+			buffer = (char *)malloc(fileSize);
+			bytesRead = fread(buffer, 1, fileSize, file);
+			fclose(file);
+			if (bytesRead != fileSize) {
+				free(buffer);
+				buffer = NULL;
+			}
+		}
+		if (!buffer) {
+			buffer = "// There was an error reading the 'portgui.h' file.\n" \
+			         "// That file isn't in the same directory as this executable,\n" \
+			         "// or you may be running on macOS?\n" \
+			         "// Here is an example anyway...\n" \
+			         "#include <stdio.h>\n\nint main() {\n	return 0;\n}";
+			fileSize = -1;
+		}
+
+		UICodeInsertContent(code, buffer, fileSize, true);
 		UICodeFocusLine(code, 0);
 	}
 
