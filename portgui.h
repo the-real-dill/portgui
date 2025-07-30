@@ -779,6 +779,7 @@ typedef struct UITextbox {
 #define UI_TEXTBOX_HIDE_CHARACTERS (1 << 0)
 	UIElement e;
 	char *string;
+	char *maskedString;  // TEMPORARY: see `_UITextboxHandleMask()`
 	ptrdiff_t bytes;
 	int carets[2];
 	int scroll;
@@ -3526,6 +3527,29 @@ void _UITextboxPasteText(void *cp) {
 	_UIClipboardReadTextEnd(textbox->e.window, text);
 }
 
+static void _UITextboxHandleMask(UITextbox *textbox) {
+/* TEMPORARY SOLUTION:
+ * This function, calls to it, and the `maskedString` member of the UITextbox
+ * struct are a temporary solution. We possibly (?) don't want to carry around
+ * a masked copy of the string, and it might be better to just have the
+ * `UIDrawString()` function provide the ability to draw a string as a series
+ * of any arbitary characters; however, that would necessitate an API change,
+ * which is not currently planned. The impact of this solution is minimal, as
+ * there would practically only ever be a small number of masked textboxes, and
+ * the cost of a "duplicate string" is very small. This may be revisted in the
+ * future to use another approach.
+ */
+	if (textbox->maskedString == NULL && textbox->bytes == 0) return;
+	if (~textbox->e.flags & UI_TEXTBOX_HIDE_CHARACTERS && textbox->bytes == 0) {
+		UI_FREE(textbox->maskedString);
+		textbox->maskedString = NULL;
+		return;
+	}
+	textbox->maskedString = (char *) UI_REALLOC(textbox->maskedString, textbox->bytes + 1);
+	for (ptrdiff_t i = 0; i < textbox->bytes; i++) textbox->maskedString[i] = '*';
+	textbox->maskedString[textbox->bytes] = 0;
+}
+
 int _UITextboxMessage(UIElement *element, UIMessage message, int di, void *dp) {
 	UITextbox *textbox = (UITextbox *) element;
 
@@ -3568,19 +3592,16 @@ int _UITextboxMessage(UIElement *element, UIMessage message, int di, void *dp) {
 		selection.colorText = ui.theme.textSelected;
 		textBounds.l -= textbox->scroll;
 
-		char *hiddenString = NULL;
+		// See `_UITextboxHandleMask()`
 		if (element->flags & UI_TEXTBOX_HIDE_CHARACTERS) {
-			hiddenString = (char *) UI_MALLOC(textbox->bytes);
-			for (intptr_t i = 0; i < textbox->bytes; i++) {
-				hiddenString[i] = '*';
-			}
+			UIDrawString((UIPainter *) dp, textBounds, textbox->maskedString ? textbox->maskedString : "", textbox->bytes,
+				(element->flags & UI_ELEMENT_DISABLED) ? ui.theme.textDisabled : ui.theme.text, UI_ALIGN_LEFT,
+				element->window->focused == element ? &selection : NULL);
+		} else {
+			UIDrawString((UIPainter *) dp, textBounds, textbox->string, textbox->bytes,
+				(element->flags & UI_ELEMENT_DISABLED) ? ui.theme.textDisabled : ui.theme.text, UI_ALIGN_LEFT,
+				element->window->focused == element ? &selection : NULL);
 		}
-
-		UIDrawString((UIPainter *) dp, textBounds, (element->flags & UI_TEXTBOX_HIDE_CHARACTERS) ? hiddenString : textbox->string, textbox->bytes,
-			(element->flags & UI_ELEMENT_DISABLED) ? ui.theme.textDisabled : ui.theme.text, UI_ALIGN_LEFT,
-			element->window->focused == element ? &selection : NULL);
-
-		if (hiddenString) UI_FREE(hiddenString);
 	} else if (message == UI_MSG_GET_CURSOR) {
 		return UI_CURSOR_TEXT;
 	} else if (message == UI_MSG_LEFT_DOWN) {
@@ -3592,6 +3613,7 @@ int _UITextboxMessage(UIElement *element, UIMessage message, int di, void *dp) {
 		UIElementRepaint(element, NULL);
 	} else if (message == UI_MSG_DEALLOCATE) {
 		UI_FREE(textbox->string);
+		UI_FREE(textbox->maskedString); // See `_UITextboxHandleMask()`
 	} else if (message == UI_MSG_KEY_TYPED) {
 		UIKeyTyped *m = (UIKeyTyped *) dp;
 		bool handled = true;
@@ -3642,6 +3664,7 @@ int _UITextboxMessage(UIElement *element, UIMessage message, int di, void *dp) {
 		}
 
 		if (handled) {
+			_UITextboxHandleMask(textbox); // See `_UITextboxHandleMask()`
 			UIElementRepaint(element, NULL);
 			return 1;
 		}
@@ -3708,6 +3731,8 @@ void UITextboxReplace(UITextbox *textbox, const char *text, ptrdiff_t bytes, boo
 	textbox->bytes += bytes;
 	textbox->carets[0] = deleteFrom + bytes;
 	textbox->carets[1] = textbox->carets[0];
+
+	_UITextboxHandleMask(textbox); // See `_UITextboxHandleMask()`
 
 	if (sendChangedMessage) UIElementMessage(&textbox->e, UI_MSG_VALUE_CHANGED, 0, 0);
 	textbox->e.window->textboxModifiedFlag = true;
