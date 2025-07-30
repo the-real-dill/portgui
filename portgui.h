@@ -4306,7 +4306,7 @@ void UICodeInsertContent(UICode *code, const char *content, ptrdiff_t byteCount,
 	int offset = 0, lineIndex = 0;
 
 	for (intptr_t i = 0; i <= byteCount && lineIndex < lineCount; i++) {
-		if (content[i] == '\n' || i == byteCount) {
+		if (i == byteCount || content[i] == '\n') {
 			UICodeLine line = { 0 };
 			line.offset = offset + code->contentBytes;
 			line.bytes = i - offset;
